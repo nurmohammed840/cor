@@ -1,0 +1,48 @@
+pub trait LEB128 {
+    fn write_byte(&mut self, byte: u8);
+    
+    fn write_u32(&mut self, mut num: u32) {
+        while num > 0b0111_1111 {
+            self.write_byte((num as u8) | 0b1000_0000); // Set continuation bit
+            num >>= 7; // Shift right by 7 bits
+        }
+        self.write_byte(num as u8); // Push last byte without continuation bit
+    }
+    
+    fn write_u64(&mut self, mut num: u64) {
+        while num > 0b0111_1111 {
+            self.write_byte((num as u8) | 0b1000_0000); // Set continuation bit
+            num >>= 7; // Shift right by 7 bits
+        }
+        self.write_byte(num as u8); // Push last byte without continuation bit
+    }
+}
+
+#[derive(Debug)]
+pub struct Leb128Buf<const N: usize> {
+    buf: [u8; N],
+    pos: u8,
+}
+
+impl<const N: usize> Leb128Buf<N> {
+    pub fn new() -> Self {
+        Self {
+            buf: [0; N],
+            pos: 0,
+        }
+    }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.buf[..self.pos as usize]
+    }
+}
+
+impl<const N: usize> LEB128 for Leb128Buf<N> {
+    fn write_byte(&mut self, byte: u8) {
+        if self.pos as usize >= N {
+            panic!("Buffer overflow");
+        }
+        self.buf[self.pos as usize] = byte; // Write the byte to the current position
+        self.pos += 1; // Move the position forward
+    }
+}
