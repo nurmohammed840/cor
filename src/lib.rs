@@ -1,5 +1,8 @@
 mod leb128;
 mod field;
+mod decoder;
+mod utils;
+mod zig_zag;
 
 use std::{
     io::{Result, Write},

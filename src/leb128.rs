@@ -1,6 +1,10 @@
+use crate::utils;
+
+use super::Result;
+
 pub trait LEB128 {
     fn write_byte(&mut self, byte: u8);
-    
+
     fn write_u32(&mut self, mut num: u32) {
         while num > 0b0111_1111 {
             self.write_byte((num as u8) | 0b1000_0000); // Set continuation bit
@@ -8,7 +12,7 @@ pub trait LEB128 {
         }
         self.write_byte(num as u8); // Push last byte without continuation bit
     }
-    
+
     fn write_u64(&mut self, mut num: u64) {
         while num > 0b0111_1111 {
             self.write_byte((num as u8) | 0b1000_0000); // Set continuation bit
@@ -44,5 +48,23 @@ impl<const N: usize> LEB128 for Leb128Buf<N> {
         }
         self.buf[self.pos as usize] = byte; // Write the byte to the current position
         self.pos += 1; // Move the position forward
+    }
+}
+
+pub fn read_unsigned(reader: &mut &[u8]) -> Result<u64> {
+    let mut result = 0;
+    let mut shift = 0;
+
+    loop {
+        let byte = utils::read_byte(reader)?;
+        result |= ((byte & 0x7F) as u64) << shift; // low-order 7 bits of value
+
+        if (byte & 0x80) == 0 {
+            break Ok(result); // No continuation bit, end of LEB128
+        }
+        if shift >= 64 {
+            return Err(utils::leb128_err());
+        }
+        shift += 7;
     }
 }

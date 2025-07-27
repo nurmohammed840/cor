@@ -49,9 +49,39 @@ impl FieldEncoder for bool {
     }
 }
 
-impl FieldEncoder for str {
+impl FieldEncoder for f32 {
     fn encode(&self, writer: &mut (impl Write + ?Sized), id: u32) -> Result<()> {
         encode_field_ty(writer, id, 2)?;
+        writer.write_all(&self.to_le_bytes())
+    }
+}
+
+impl FieldEncoder for f64 {
+    fn encode(&self, writer: &mut (impl Write + ?Sized), id: u32) -> Result<()> {
+        encode_field_ty(writer, id, 3)?;
+        writer.write_all(&self.to_le_bytes())
+    }
+}
+
+fn encode_sign(writer: &mut (impl Write + ?Sized), id: u32, num: impl Into<i64>) -> Result<()> {
+    encode_field_ty(writer, id, 4)?;
+
+    let mut buf = Leb128Buf::<10>::new();
+    buf.write_u64(zig_zag::into(num.into()));
+    writer.write_all(buf.as_bytes())
+}
+
+fn encode_unsign(writer: &mut (impl Write + ?Sized), id: u32, num: impl Into<u64>) -> Result<()> {
+    encode_field_ty(writer, id, 5)?;
+
+    let mut buf = Leb128Buf::<10>::new();
+    buf.write_u64(num.into());
+    writer.write_all(buf.as_bytes())
+}
+
+impl FieldEncoder for str {
+    fn encode(&self, writer: &mut (impl Write + ?Sized), id: u32) -> Result<()> {
+        encode_field_ty(writer, id, 6)?;
         encode_len_u32(writer, self.as_bytes().len())?;
         writer.write_all(self.as_bytes())
     }
@@ -59,48 +89,10 @@ impl FieldEncoder for str {
 
 impl FieldEncoder for [u8] {
     fn encode(&self, writer: &mut (impl Write + ?Sized), id: u32) -> Result<()> {
-        encode_field_ty(writer, id, 3)?;
+        encode_field_ty(writer, id, 7)?;
         encode_len_u32(writer, self.len())?;
         writer.write_all(self)
     }
-}
-
-impl FieldEncoder for f32 {
-    fn encode(&self, writer: &mut (impl Write + ?Sized), id: u32) -> Result<()> {
-        encode_field_ty(writer, id, 4)?;
-        writer.write_all(&self.to_le_bytes())
-    }
-}
-
-impl FieldEncoder for f64 {
-    fn encode(&self, writer: &mut (impl Write + ?Sized), id: u32) -> Result<()> {
-        encode_field_ty(writer, id, 5)?;
-        writer.write_all(&self.to_le_bytes())
-    }
-}
-
-fn encode_unsign(writer: &mut (impl Write + ?Sized), id: u32, num: impl Into<u64>) -> Result<()> {
-    encode_field_ty(writer, id, 6)?;
-
-    let mut buf = Leb128Buf::<10>::new();
-    buf.write_u64(num.into());
-    writer.write_all(buf.as_bytes())
-}
-
-fn to_zig_zag(num: i64) -> u64 {
-    ((num << 1) ^ (num >> 63)) as u64
-}
-
-// fn from_zig_zag(num: u64) -> i64 {
-//     ((num >> 1) as i64) ^ -((num & 1) as i64)
-// }
-
-fn encode_sign(writer: &mut (impl Write + ?Sized), id: u32, num: impl Into<i64>) -> Result<()> {
-    encode_field_ty(writer, id, 7)?;
-
-    let mut buf = Leb128Buf::<10>::new();
-    buf.write_u64(to_zig_zag(num.into()));
-    writer.write_all(buf.as_bytes())
 }
 
 macro_rules! impl_for {
@@ -128,9 +120,45 @@ impl_for! {
     sign: i8 i16 i32 i64
 }
 
-impl<T: Encoder> FieldEncoder for T {
+// ----------------------------------------------
+
+trait Element {
+    fn ty() -> u8;
+    fn encode(&self, writer: &mut (impl Write + ?Sized)) -> Result<()>;
+}
+
+impl Element for bool {
+    fn ty() -> u8 {
+        1
+    }
+
+    fn encode(&self, writer: &mut (impl Write + ?Sized)) -> Result<()> {
+        writer.write_all(&[match self {
+            false => 1,
+            true => 2,
+        }])
+    }
+}
+
+impl<T: Element> FieldEncoder for [T] {
     fn encode(&self, writer: &mut (impl Write + ?Sized), id: u32) -> Result<()> {
         encode_field_ty(writer, id, 8)?;
+
+        // +--------+--------+...+--------+
+        // |sssstttt| elements            |
+        // +--------+--------+...+--------+
+        // Compact protocol list header (2+ bytes, long form) and elements:
+        // +--------+--------+...+--------+--------+...+--------+
+        // |1111tttt| size                | elements            |
+        // +--------+--------+...+--------+--------+...+--------+
+        encode_field_ty(writer, self.len().try_into().unwrap(), T::ty())?;
+        self.iter().try_for_each(|el| T::encode(el, writer))
+    }
+}
+
+impl<T: Encoder> FieldEncoder for T {
+    fn encode(&self, writer: &mut (impl Write + ?Sized), id: u32) -> Result<()> {
+        encode_field_ty(writer, id, 9)?;
         T::encode(self, writer)
     }
 }
