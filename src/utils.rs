@@ -1,3 +1,4 @@
+use crate::errors;
 use std::io;
 
 pub fn read_byte(buf: &mut &[u8]) -> io::Result<u8> {
@@ -8,16 +9,8 @@ pub fn read_byte(buf: &mut &[u8]) -> io::Result<u8> {
             Ok(byte)
         }
     } else {
-        Err(eof_err())
+        Err(errors::eof())
     }
-}
-
-pub fn eof_err() -> io::Error {
-    io::Error::new(io::ErrorKind::UnexpectedEof, "Failed to read field type")
-}
-
-pub fn leb128_err() -> io::Error {
-    io::Error::new(io::ErrorKind::InvalidData, "LEB128 overflow")
 }
 
 pub fn read_buf<const N: usize>(reader: &mut &[u8]) -> io::Result<[u8; N]> {
@@ -32,6 +25,6 @@ pub fn read_bytes<'de>(reader: &mut &'de [u8], len: usize) -> io::Result<&'de [u
             Ok(slice)
         }
     } else {
-        Err(eof_err())
+        Err(errors::eof())
     }
 }

@@ -1,12 +1,11 @@
-mod leb128;
-mod field;
 mod decoder;
+mod errors;
+mod field;
+mod leb128;
 mod utils;
 mod zig_zag;
 
-use std::{
-    io::{Result, Write},
-};
+use std::io::{Result, Write};
 
 pub trait Encoder {
     fn encode(&self, _: &mut (impl Write + ?Sized)) -> Result<()>;

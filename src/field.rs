@@ -6,10 +6,6 @@ pub trait FieldEncoder {
     fn encode(&self, writer: &mut (impl Write + ?Sized), id: u32) -> Result<()>;
 }
 
-// pub trait FieldDecoder<'de>: Sized {
-//     fn decode(_: &mut &'de [u8]) -> Result<Self>;
-// }
-
 impl<T: FieldEncoder> FieldEncoder for Option<T> {
     fn encode(&self, writer: &mut (impl Write + ?Sized), id: u32) -> Result<()> {
         match self {
@@ -81,9 +77,11 @@ fn encode_unsign(writer: &mut (impl Write + ?Sized), id: u32, num: impl Into<u64
 
 impl FieldEncoder for str {
     fn encode(&self, writer: &mut (impl Write + ?Sized), id: u32) -> Result<()> {
+        let bytes = self.as_bytes();
+
         encode_field_ty(writer, id, 6)?;
-        encode_len_u32(writer, self.as_bytes().len())?;
-        writer.write_all(self.as_bytes())
+        encode_len_u32(writer, bytes.len())?;
+        writer.write_all(bytes)
     }
 }
 
@@ -122,12 +120,12 @@ impl_for! {
 
 // ----------------------------------------------
 
-trait Element {
+trait Item {
     fn ty() -> u8;
     fn encode(&self, writer: &mut (impl Write + ?Sized)) -> Result<()>;
 }
 
-impl Element for bool {
+impl Item for bool {
     fn ty() -> u8 {
         1
     }
@@ -140,7 +138,7 @@ impl Element for bool {
     }
 }
 
-impl<T: Element> FieldEncoder for [T] {
+impl<T: Item> FieldEncoder for [T] {
     fn encode(&self, writer: &mut (impl Write + ?Sized), id: u32) -> Result<()> {
         encode_field_ty(writer, id, 8)?;
 
@@ -162,4 +160,3 @@ impl<T: Encoder> FieldEncoder for T {
         T::encode(self, writer)
     }
 }
-

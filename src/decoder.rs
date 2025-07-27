@@ -1,5 +1,5 @@
 #![allow(warnings)]
-use crate::{leb128, utils, zig_zag};
+use crate::{errors, leb128, utils, zig_zag};
 
 use super::Result;
 use std::{
@@ -101,11 +101,12 @@ fn parse_list(reader: &mut &[u8]) -> Result<List> {
         6 => collect(len, || parse_string(reader)).map(List::Str),
         7 => collect(len, || parse_bytes(reader)).map(List::Bytes),
         8 => collect(len, || parse_list(reader)).map(List::List),
-        _ => todo!(),
+        9 => collect(len, || parse_struct(reader)).map(List::Struct),
+        op => Err(errors::unknown_opcode(op)),
     }
 }
 
-fn parse(reader: &mut &[u8]) -> Result<Value> {
+fn parse_struct(reader: &mut &[u8]) -> Result<Vec<(u32, Value)>> {
     let mut obj = Vec::new();
 
     loop {
@@ -130,14 +131,14 @@ fn parse(reader: &mut &[u8]) -> Result<Value> {
             6 => parse_string(reader).map(Value::Str),
             7 => parse_bytes(reader).map(Value::Bytes),
             8 => parse_list(reader).map(Value::List),
-            // 10 => {
-            //     debug_assert!(id != 0);
-            //     break; // End of struct
-            // }
-            _ => todo!(),
+            9 => parse_struct(reader).map(Value::Struct),
+            10 => {
+                debug_assert!(id != 0);
+                break; // End of struct
+            }
+            op => Err(errors::unknown_opcode(op)),
         };
         obj.push((id, val?));
     }
-
-    Ok(Value::Struct(obj))
+    Ok(obj)
 }
