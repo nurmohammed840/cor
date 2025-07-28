@@ -3,12 +3,12 @@ use crate::{errors, leb128, utils, zig_zag};
 
 use super::Result;
 use std::{
-    fmt,
+    fmt::{self, Write},
     io::{self, Read},
 };
 
 #[derive(Clone)]
-enum Value {
+pub enum Value {
     Bool(bool),
     F32(f32),
     F64(f64),
@@ -20,8 +20,8 @@ enum Value {
     Struct(Vec<(u32, Value)>),
 }
 
-#[derive(Clone)]
-enum List {
+#[derive(Clone, Debug)]
+pub enum List {
     Bool(Vec<bool>),
     F32(Vec<f32>),
     F64(Vec<f64>),
@@ -33,24 +33,35 @@ enum List {
     Struct(Vec<Vec<(u32, Value)>>),
 }
 
-// impl fmt::Debug for Value {
-//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//         match self {
-//             Value::I(val) => val.fmt(f),
-//             Value::U(val) => write!(f, "{val}u",),
-//             Value::Str(val) => val.fmt(f),
-//             Value::Bytes(val) => fmt::Debug::fmt(val, f),
-//             Value::F32(val) => write!(f, "{val}_f32",),
-//             Value::F64(val) => val.fmt(f),
-//             Value::Bool(val) => val.fmt(f),
-//             // Value::List(values) => f.debug_list().entries(values.iter()).finish(),
-//             Value::Struct(items) => f
-//                 .debug_map()
-//                 .entries(items.iter().map(|(id, val)| (id, val)))
-//                 .finish(),
-//         }
-//     }
-// }
+impl fmt::Debug for Value {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Value::Int(val) => val.fmt(f),
+            Value::UInt(val) => write!(f, "{val}u",),
+            Value::Str(val) => val.fmt(f),
+            Value::Bytes(bytes) => {
+                f.write_char('(')?;
+                let mut bytes = bytes.iter().peekable();
+                while let Some(byte) = bytes.next() {
+                    if bytes.peek().is_some() {
+                        write!(f, "{byte} ")?;
+                    } else {
+                        write!(f, "{byte}")?;
+                    }
+                }
+                f.write_char(')')
+            }
+            Value::F32(val) => write!(f, "{val}_f32",),
+            Value::F64(val) => val.fmt(f),
+            Value::Bool(val) => val.fmt(f),
+            Value::List(list) => list.fmt(f),
+            Value::Struct(items) => f
+                .debug_map()
+                .entries(items.iter().map(|(id, val)| (id, val)))
+                .finish(),
+        }
+    }
+}
 
 fn decode_field_ty(reader: &mut &[u8]) -> Result<(u32, u8)> {
     let byte = utils::read_byte(reader)?;
@@ -106,7 +117,7 @@ fn parse_list(reader: &mut &[u8]) -> Result<List> {
     }
 }
 
-fn parse_struct(reader: &mut &[u8]) -> Result<Vec<(u32, Value)>> {
+pub fn parse_struct(reader: &mut &[u8]) -> Result<Vec<(u32, Value)>> {
     let mut obj = Vec::new();
 
     loop {
@@ -133,7 +144,7 @@ fn parse_struct(reader: &mut &[u8]) -> Result<Vec<(u32, Value)>> {
             8 => parse_list(reader).map(Value::List),
             9 => parse_struct(reader).map(Value::Struct),
             10 => {
-                debug_assert!(id != 0);
+                debug_assert!(id == 0);
                 break; // End of struct
             }
             op => Err(errors::unknown_opcode(op)),

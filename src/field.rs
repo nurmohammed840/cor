@@ -2,6 +2,7 @@ use leb128::*;
 
 use super::*;
 
+// #[doc(hidden)]
 pub trait FieldEncoder {
     fn encode(&self, writer: &mut (impl Write + ?Sized), id: u32) -> Result<()>;
 }
@@ -16,7 +17,7 @@ impl<T: FieldEncoder> FieldEncoder for Option<T> {
 }
 
 fn encode_field_ty(writer: &mut (impl Write + ?Sized), id: u32, ty: u8) -> Result<()> {
-    if id >= 15 {
+    if id < 15 {
         let header = (id as u8) << 4;
         writer.write_all(&[header | ty])
     } else {
@@ -138,6 +139,91 @@ impl Item for bool {
     }
 }
 
+impl Item for f32 {
+    fn ty() -> u8 {
+        2
+    }
+
+    fn encode(&self, writer: &mut (impl Write + ?Sized)) -> Result<()> {
+        writer.write_all(&self.to_le_bytes())
+    }
+}
+
+impl Item for f64 {
+    fn ty() -> u8 {
+        3
+    }
+    fn encode(&self, writer: &mut (impl Write + ?Sized)) -> Result<()> {
+        writer.write_all(&self.to_le_bytes())
+    }
+}
+
+macro_rules! impl_item {
+    (@sign: $($ty: ty),*) => {$(
+        impl Item for $ty {
+            fn ty() -> u8 { 4 }
+            fn encode(&self, writer: &mut (impl Write + ?Sized)) -> Result<()> {
+                let mut buf = Leb128Buf::<10>::new();
+                buf.write_u64(zig_zag::into((*self).into()));
+                writer.write_all(buf.as_bytes())
+            }
+        }
+    )*};
+    (@unsign: $($ty: ty),*) => {$(
+        impl Item for $ty {
+            fn ty() -> u8 { 5 }
+            fn encode(&self, writer: &mut (impl Write + ?Sized)) -> Result<()> {
+                let mut buf = Leb128Buf::<10>::new();
+                buf.write_u64((*self).into());
+                writer.write_all(buf.as_bytes())
+            }
+        }
+    )*};
+}
+
+impl_item! { @sign: i16, i32, i64 }
+impl_item! { @unsign: u16, u32, u64 }
+
+impl Item for str {
+    fn ty() -> u8 {
+        6
+    }
+
+    fn encode(&self, writer: &mut (impl Write + ?Sized)) -> Result<()> {
+        let bytes = self.as_bytes();
+        encode_len_u32(writer, bytes.len())?;
+        writer.write_all(bytes)
+    }
+}
+
+impl Item for [u8] {
+    fn ty() -> u8 {
+        7
+    }
+    fn encode(&self, writer: &mut (impl Write + ?Sized)) -> Result<()> {
+        encode_len_u32(writer, self.len())?;
+        writer.write_all(self)
+    }
+}
+
+impl<T: Item> Item for [T] {
+    fn ty() -> u8 {
+        8
+    }
+    fn encode(&self, writer: &mut (impl Write + ?Sized)) -> Result<()> {
+        self.iter().try_for_each(|el| T::encode(el, writer))
+    }
+}
+
+impl<T: Encoder> Item for T {
+    fn ty() -> u8 {
+        9
+    }
+    fn encode(&self, writer: &mut (impl Write + ?Sized)) -> Result<()> {
+        T::encode(self, writer)
+    }
+}
+
 impl<T: Item> FieldEncoder for [T] {
     fn encode(&self, writer: &mut (impl Write + ?Sized), id: u32) -> Result<()> {
         encode_field_ty(writer, id, 8)?;
@@ -158,5 +244,19 @@ impl<T: Encoder> FieldEncoder for T {
     fn encode(&self, writer: &mut (impl Write + ?Sized), id: u32) -> Result<()> {
         encode_field_ty(writer, id, 9)?;
         T::encode(self, writer)
+    }
+}
+
+// ------------------------------------------------------------------------------------
+
+impl FieldEncoder for String {
+    fn encode(&self, writer: &mut (impl Write + ?Sized), id: u32) -> Result<()> {
+        FieldEncoder::encode(self.as_str(), writer, id)
+    }
+}
+
+impl FieldEncoder for Vec<u8> {
+    fn encode(&self, writer: &mut (impl Write + ?Sized), id: u32) -> Result<()> {
+        FieldEncoder::encode(self.as_slice(), writer, id)
     }
 }
