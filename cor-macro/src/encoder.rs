@@ -1,5 +1,7 @@
-use quote2::{Quote, proc_macro2::TokenStream, quote};
-use syn::{Data, DataStruct, DeriveInput, Expr, Field, Meta};
+use std::collections::HashSet;
+
+use quote2::{Quote, ToTokens, proc_macro2::TokenStream, quote};
+use syn::{Data, DataStruct, DeriveInput, Error, Expr, Field, Meta, spanned::Spanned};
 
 pub fn expand(input: DeriveInput) -> TokenStream {
     let DeriveInput {
@@ -11,8 +13,28 @@ pub fn expand(input: DeriveInput) -> TokenStream {
 
     let body = quote(|t| match data {
         Data::Struct(DataStruct { fields, .. }) => {
+            let mut seen = HashSet::<&Expr>::new();
+
             for field in fields {
                 if let Some(key) = get_key(field) {
+                    match seen.get(key) {
+                        Some(key1) => {
+                            let mut err = Error::new(key1.span(), "duplicate key");
+                            err.combine(Error::new(
+                                key.span(),
+                                format!(
+                                    "duplicate key `{}` later defined here",
+                                    key1.to_token_stream()
+                                ),
+                            ));
+                            let err = err.to_compile_error();
+                            quote!(t, { #err });
+                        }
+                        None => {
+                            seen.insert(key);
+                        }
+                    }
+
                     let ident = &field.ident;
                     quote!(t, {
                         ::cor::FieldEncoder::encode(&self.#ident, w, #key)?;

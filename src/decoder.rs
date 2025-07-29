@@ -20,7 +20,7 @@ pub enum Value {
     Struct(Vec<(u32, Value)>),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub enum List {
     Bool(Vec<bool>),
     F32(Vec<f32>),
@@ -31,6 +31,22 @@ pub enum List {
     Bytes(Vec<Vec<u8>>),
     List(Vec<List>),
     Struct(Vec<Vec<(u32, Value)>>),
+}
+
+impl fmt::Debug for List {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Bool(val) => fmt::Debug::fmt(val, f),
+            Self::F32(val) => fmt::Debug::fmt(val, f),
+            Self::F64(val) => fmt::Debug::fmt(val, f),
+            Self::Int(val) => fmt::Debug::fmt(val, f),
+            Self::UInt(val) => fmt::Debug::fmt(val, f),
+            Self::Str(val) => fmt::Debug::fmt(val, f),
+            Self::Bytes(val) => fmt::Debug::fmt(val, f),
+            Self::List(val) => fmt::Debug::fmt(val, f),
+            Self::Struct(val) => fmt::Debug::fmt(val, f),
+        }
+    }
 }
 
 impl fmt::Debug for Value {
@@ -51,7 +67,7 @@ impl fmt::Debug for Value {
                 }
                 f.write_char(')')
             }
-            Value::F32(val) => write!(f, "{val}_f32",),
+            Value::F32(val) => write!(f, "{val}f",),
             Value::F64(val) => val.fmt(f),
             Value::Bool(val) => val.fmt(f),
             Value::List(list) => list.fmt(f),

@@ -10,6 +10,8 @@ struct User {
     age: u8,
     #[key = 3]
     msg: Vec<u8>,
+    #[key = 4]
+    balance: f32,
 }
 
 #[test]
@@ -19,6 +21,7 @@ fn test_name() {
         email: Some("john_doe@xyz.com".into()),
         age: 42,
         msg: vec![1, 2, 3, 4, 5],
+        balance: 4.,
     };
 
     let mut buf = Vec::new();
