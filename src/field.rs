@@ -86,11 +86,23 @@ impl FieldEncoder for str {
     }
 }
 
+impl FieldEncoder for String {
+    fn encode(&self, writer: &mut (impl Write + ?Sized), id: u32) -> Result<()> {
+        FieldEncoder::encode(self.as_str(), writer, id)
+    }
+}
+
 impl FieldEncoder for [u8] {
     fn encode(&self, writer: &mut (impl Write + ?Sized), id: u32) -> Result<()> {
         encode_field_ty(writer, id, 7)?;
         encode_len_u32(writer, self.len())?;
         writer.write_all(self)
+    }
+}
+
+impl FieldEncoder for Vec<u8> {
+    fn encode(&self, writer: &mut (impl Write + ?Sized), id: u32) -> Result<()> {
+        FieldEncoder::encode(self.as_slice(), writer, id)
     }
 }
 
@@ -206,7 +218,7 @@ impl Item for [u8] {
     }
 }
 
-impl<T: Item> Item for [T] {
+impl<T: Item> Item for Vec<T> {
     fn ty() -> u8 {
         8
     }
@@ -224,7 +236,7 @@ impl<T: Encoder> Item for T {
     }
 }
 
-impl<T: Item> FieldEncoder for [T] {
+impl<T: Item> FieldEncoder for Vec<T> {
     fn encode(&self, writer: &mut (impl Write + ?Sized), id: u32) -> Result<()> {
         encode_field_ty(writer, id, 8)?;
 
@@ -244,19 +256,5 @@ impl<T: Encoder> FieldEncoder for T {
     fn encode(&self, writer: &mut (impl Write + ?Sized), id: u32) -> Result<()> {
         encode_field_ty(writer, id, 9)?;
         T::encode(self, writer)
-    }
-}
-
-// ------------------------------------------------------------------------------------
-
-impl FieldEncoder for String {
-    fn encode(&self, writer: &mut (impl Write + ?Sized), id: u32) -> Result<()> {
-        FieldEncoder::encode(self.as_str(), writer, id)
-    }
-}
-
-impl FieldEncoder for Vec<u8> {
-    fn encode(&self, writer: &mut (impl Write + ?Sized), id: u32) -> Result<()> {
-        FieldEncoder::encode(self.as_slice(), writer, id)
     }
 }

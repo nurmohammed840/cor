@@ -8,32 +8,32 @@ use std::{
 };
 
 #[derive(Clone)]
-pub enum Value {
+pub enum Value<'de> {
     Bool(bool),
     F32(f32),
     F64(f64),
     Int(i64),
     UInt(u64),
-    Str(String),
-    Bytes(Vec<u8>),
-    List(List),
-    Struct(Vec<(u32, Value)>),
+    Str(&'de str),
+    Bytes(&'de [u8]),
+    List(List<'de>),
+    Struct(Vec<(u32, Value<'de>)>),
 }
 
 #[derive(Clone)]
-pub enum List {
+pub enum List<'de> {
     Bool(Vec<bool>),
     F32(Vec<f32>),
     F64(Vec<f64>),
     Int(Vec<i64>),
     UInt(Vec<u64>),
-    Str(Vec<String>),
-    Bytes(Vec<Vec<u8>>),
-    List(Vec<List>),
-    Struct(Vec<Vec<(u32, Value)>>),
+    Str(Vec<&'de str>),
+    Bytes(Vec<&'de [u8]>),
+    List(Vec<List<'de>>),
+    Struct(Vec<Vec<(u32, Value<'de>)>>),
 }
 
-impl fmt::Debug for List {
+impl fmt::Debug for List<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Bool(val) => fmt::Debug::fmt(val, f),
@@ -49,7 +49,7 @@ impl fmt::Debug for List {
     }
 }
 
-impl fmt::Debug for Value {
+impl fmt::Debug for Value<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Value::Int(val) => val.fmt(f),
@@ -98,15 +98,15 @@ fn try_into_u32(num: u64) -> Result<u32> {
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "number out of range"))
 }
 
-fn parse_string(reader: &mut &[u8]) -> Result<String> {
+fn parse_string<'de>(reader: &mut &'de [u8]) -> Result<&'de str> {
     parse_bytes(reader)
-        .map(String::from_utf8)?
+        .map(str::from_utf8)?
         .map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))
 }
 
-fn parse_bytes(reader: &mut &[u8]) -> Result<Vec<u8>> {
+fn parse_bytes<'de>(reader: &mut &'de [u8]) -> Result<&'de [u8]> {
     let len = leb128::read_unsigned(reader).map(try_into_u32)??;
-    Ok(utils::read_bytes(reader, len as usize)?.to_owned())
+    Ok(utils::read_bytes(reader, len as usize)?)
 }
 
 fn collect<T>(len: u32, mut f: impl FnMut() -> Result<T>) -> Result<Vec<T>> {
@@ -117,7 +117,7 @@ fn collect<T>(len: u32, mut f: impl FnMut() -> Result<T>) -> Result<Vec<T>> {
     Ok(arr)
 }
 
-fn parse_list(reader: &mut &[u8]) -> Result<List> {
+fn parse_list<'de>(reader: &mut &'de [u8]) -> Result<List<'de>> {
     let (len, ty) = decode_field_ty(reader)?;
     match ty {
         0 | 1 => collect(len, || Ok(utils::read_byte(reader)? != 0)).map(List::Bool),
@@ -133,7 +133,7 @@ fn parse_list(reader: &mut &[u8]) -> Result<List> {
     }
 }
 
-pub fn parse_struct(reader: &mut &[u8]) -> Result<Vec<(u32, Value)>> {
+pub fn parse_struct<'de>(reader: &mut &'de [u8]) -> Result<Vec<(u32, Value<'de>)>> {
     let mut obj = Vec::new();
 
     loop {
