@@ -258,3 +258,4 @@ impl<T: Encoder> FieldEncoder for T {
         T::encode(self, writer)
     }
 }
+

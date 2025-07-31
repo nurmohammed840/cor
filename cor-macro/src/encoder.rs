@@ -1,7 +1,11 @@
 use std::collections::HashSet;
 
-use quote2::{Quote, ToTokens, proc_macro2::TokenStream, quote};
-use syn::{Data, DataStruct, DeriveInput, Error, Expr, Field, Meta, spanned::Spanned};
+use quote2::{
+    Quote, ToTokens,
+    proc_macro2::{Punct, Spacing, TokenStream},
+    quote,
+};
+use syn::{Data, DataStruct, DeriveInput, Error, Expr, Field, Meta, Type, spanned::Spanned};
 
 pub fn expand(input: DeriveInput) -> TokenStream {
     let DeriveInput {
@@ -13,7 +17,7 @@ pub fn expand(input: DeriveInput) -> TokenStream {
 
     let body = quote(|t| match data {
         Data::Struct(DataStruct { fields, .. }) => {
-            let mut seen = HashSet::<&Expr>::new();
+            let mut seen: HashSet<&Expr> = HashSet::new();
 
             for field in fields {
                 if let Some(key) = get_key(field) {
@@ -36,8 +40,13 @@ pub fn expand(input: DeriveInput) -> TokenStream {
                     }
 
                     let ident = &field.ident;
+                    let ref_symbol = match field.ty {
+                        Type::Reference(_) => None,
+                        _ => Some(Punct::new('&', Spacing::Alone)),
+                    };
+
                     quote!(t, {
-                        ::cor::FieldEncoder::encode(&self.#ident, w, #key)?;
+                        ::cor::FieldEncoder::encode(#ref_symbol self.#ident, w, #key)?;
                     });
                 }
             }

@@ -1,6 +1,6 @@
 mod decoder;
+mod encoder;
 mod errors;
-mod field;
 mod leb128;
 mod utils;
 mod zig_zag;
@@ -8,7 +8,7 @@ mod zig_zag;
 use std::io::{Result, Write};
 
 pub use cor_macro::*;
-pub use field::FieldEncoder;
+pub use encoder::FieldEncoder;
 pub use decoder::*;
 
 pub trait Encoder {

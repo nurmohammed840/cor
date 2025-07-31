@@ -1,10 +1,9 @@
-#![allow(warnings)]
 use crate::{errors, leb128, utils, zig_zag};
 
 use super::Result;
 use std::{
     fmt::{self, Write},
-    io::{self, Read},
+    io,
 };
 
 #[derive(Clone)]
@@ -67,7 +66,7 @@ impl fmt::Debug for Value<'_> {
                 }
                 f.write_char(')')
             }
-            Value::F32(val) => write!(f, "{val}f",),
+            Value::F32(val) => write!(f, "{val:#?}f"),
             Value::F64(val) => val.fmt(f),
             Value::Bool(val) => val.fmt(f),
             Value::List(list) => list.fmt(f),
