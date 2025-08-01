@@ -6,6 +6,14 @@ use std::{
     io,
 };
 
+#[derive(Clone, Debug)]
+pub struct Entry<'de> {
+    key: u32,
+    value: Value<'de>,
+}
+
+type Entries<'de> = Vec<Entry<'de>>;
+
 #[derive(Clone)]
 pub enum Value<'de> {
     Bool(bool),
@@ -16,7 +24,7 @@ pub enum Value<'de> {
     Str(&'de str),
     Bytes(&'de [u8]),
     List(List<'de>),
-    Struct(Vec<(u32, Value<'de>)>),
+    Struct(Entries<'de>),
 }
 
 #[derive(Clone)]
@@ -29,7 +37,7 @@ pub enum List<'de> {
     Str(Vec<&'de str>),
     Bytes(Vec<&'de [u8]>),
     List(Vec<List<'de>>),
-    Struct(Vec<Vec<(u32, Value<'de>)>>),
+    Struct(Vec<Entries<'de>>),
 }
 
 impl Debug for List<'_> {
@@ -72,7 +80,7 @@ impl Debug for Value<'_> {
             Value::List(list) => list.fmt(f),
             Value::Struct(items) => f
                 .debug_map()
-                .entries(items.iter().map(|(id, val)| (id, val)))
+                .entries(items.iter().map(|Entry { key, value }| (key, value)))
                 .finish(),
         }
     }
@@ -132,12 +140,12 @@ fn parse_list<'de>(reader: &mut &'de [u8]) -> Result<List<'de>> {
     }
 }
 
-pub fn parse_struct<'de>(reader: &mut &'de [u8]) -> Result<Vec<(u32, Value<'de>)>> {
+pub fn parse_struct<'de>(reader: &mut &'de [u8]) -> Result<Vec<Entry<'de>>> {
     let mut obj = Vec::new();
 
     loop {
-        let (id, ty) = decode_field_ty(reader)?;
-        let val = match ty {
+        let (key, ty) = decode_field_ty(reader)?;
+        let value = match ty {
             0 => Ok(Value::Bool(false)),
             1 => Ok(Value::Bool(true)),
 
@@ -159,12 +167,12 @@ pub fn parse_struct<'de>(reader: &mut &'de [u8]) -> Result<Vec<(u32, Value<'de>)
             8 => parse_list(reader).map(Value::List),
             9 => parse_struct(reader).map(Value::Struct),
             10 => {
-                debug_assert!(id == 0);
+                debug_assert!(key == 0);
                 break; // End of struct
             }
             op => Err(errors::unknown_opcode(op)),
-        };
-        obj.push((id, val?));
+        }?;
+        obj.push(Entry { key, value });
     }
     Ok(obj)
 }
