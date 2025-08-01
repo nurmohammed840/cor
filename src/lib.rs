@@ -5,11 +5,13 @@ mod leb128;
 mod utils;
 mod zig_zag;
 
-use std::io::{Result, Write};
+use std::io::Write;
 
 pub use cor_macro::*;
-pub use encoder::FieldEncoder;
 pub use decoder::*;
+pub use encoder::FieldEncoder;
+
+pub type Result<T, E = std::io::Error> = std::result::Result<T, E>;
 
 pub trait Encoder {
     fn encode(&self, _: &mut (impl Write + ?Sized)) -> Result<()>;

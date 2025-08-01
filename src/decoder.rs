@@ -2,7 +2,7 @@ use crate::{errors, leb128, utils, zig_zag};
 
 use super::Result;
 use std::{
-    fmt::{self, Write},
+    fmt::{self, Debug, Write},
     io,
 };
 
@@ -32,23 +32,23 @@ pub enum List<'de> {
     Struct(Vec<Vec<(u32, Value<'de>)>>),
 }
 
-impl fmt::Debug for List<'_> {
+impl Debug for List<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Bool(val) => fmt::Debug::fmt(val, f),
-            Self::F32(val) => fmt::Debug::fmt(val, f),
-            Self::F64(val) => fmt::Debug::fmt(val, f),
-            Self::Int(val) => fmt::Debug::fmt(val, f),
-            Self::UInt(val) => fmt::Debug::fmt(val, f),
-            Self::Str(val) => fmt::Debug::fmt(val, f),
-            Self::Bytes(val) => fmt::Debug::fmt(val, f),
-            Self::List(val) => fmt::Debug::fmt(val, f),
-            Self::Struct(val) => fmt::Debug::fmt(val, f),
+            Self::Bool(val) => Debug::fmt(val, f),
+            Self::F32(val) => Debug::fmt(val, f),
+            Self::F64(val) => Debug::fmt(val, f),
+            Self::Int(val) => Debug::fmt(val, f),
+            Self::UInt(val) => Debug::fmt(val, f),
+            Self::Str(val) => Debug::fmt(val, f),
+            Self::Bytes(val) => Debug::fmt(val, f),
+            Self::List(val) => Debug::fmt(val, f),
+            Self::Struct(val) => Debug::fmt(val, f),
         }
     }
 }
 
-impl fmt::Debug for Value<'_> {
+impl Debug for Value<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Value::Int(val) => val.fmt(f),
@@ -105,7 +105,7 @@ fn parse_string<'de>(reader: &mut &'de [u8]) -> Result<&'de str> {
 
 fn parse_bytes<'de>(reader: &mut &'de [u8]) -> Result<&'de [u8]> {
     let len = leb128::read_unsigned(reader).map(try_into_u32)??;
-    Ok(utils::read_bytes(reader, len as usize)?)
+    utils::read_bytes(reader, len as usize)
 }
 
 fn collect<T>(len: u32, mut f: impl FnMut() -> Result<T>) -> Result<Vec<T>> {
@@ -167,4 +167,62 @@ pub fn parse_struct<'de>(reader: &mut &'de [u8]) -> Result<Vec<(u32, Value<'de>)
         obj.push((id, val?));
     }
     Ok(obj)
+}
+
+macro_rules! convert {
+    [$($name:ident($ty:ty))*] => [$(
+        impl<'de> TryFrom<&Value<'de>> for $ty {
+            type Error = io::Error;
+            fn try_from(val: &Value<'de>) -> Result<Self> {
+                match val {
+                    Value::$name(val) => Ok(*val),
+                    val => Err(val.invalid_type(std::any::type_name::<$ty>())),
+                }
+            }
+        }
+    )*];
+    [$($name:ident => $ty:ty)*] => [$(
+        impl TryFrom<&Value<'_>> for $ty {
+            type Error = io::Error;
+            fn try_from(val: &Value) -> Result<Self> {
+                match val {
+                    Value::$name(val) => <$ty>::try_from(*val).map_err(errors::invalid_input),
+                    val => Err(val.invalid_type(std::any::type_name::<$ty>())),
+                }
+            }
+        }
+    )*]
+}
+
+convert! {
+    Bool(bool)
+    F32(f32)
+    F64(f64)
+    Int(i64)
+    UInt(u64)
+    Str(&'de str)
+    Bytes(&'de [u8])
+}
+
+convert! {
+    Int => i8
+    Int => i16
+    Int => i32
+
+    UInt => u8
+    UInt => u16
+    UInt => u32
+}
+
+impl Value<'_> {
+    pub fn try_get<'e, T>(key: u32, entries: &'e Vec<(u32, Self)>) -> Result<Option<T>, T::Error>
+    where
+        T: TryFrom<&'e Self>,
+    {
+        entries
+            .iter()
+            .find_map(|(k, v)| (*k == key).then_some(v))
+            .map(T::try_from)
+            .transpose()
+    }
 }
