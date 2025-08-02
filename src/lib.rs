@@ -5,6 +5,7 @@ mod errors;
 mod leb128;
 mod utils;
 mod zig_zag;
+mod convert;
 
 use std::io::Write;
 
@@ -21,5 +22,9 @@ pub trait Encoder {
 }
 
 pub trait Decoder<'de>: Sized {
-    fn decode(_: &mut &'de [u8]) -> Result<Self>;
+    fn parse(reader: &mut &'de [u8]) -> Result<Self> {
+        Self::decode(&Entries::parse(reader)?)
+    }
+
+    fn decode(entries: &Entries<'de>) -> Result<Self>;
 }

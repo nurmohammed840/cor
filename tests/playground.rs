@@ -29,6 +29,6 @@ fn test_name() {
     // println!("buf: {:#?}", buf);
 
     let mut reader = &buf[..];
-    let val = cor::parse_struct(&mut reader).unwrap();
+    let val = cor::Entries::parse(&mut reader).unwrap();
     println!("{:#?}", cor::Value::Struct(val));
 }

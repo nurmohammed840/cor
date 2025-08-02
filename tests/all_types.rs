@@ -58,8 +58,7 @@ struct Types<'a> {
 }
 
 impl<'de> cor::Decoder<'de> for Types<'de> {
-    fn decode(r: &mut &'de [u8]) -> std::io::Result<Self> {
-        let entries = ::cor::parse_struct(r)?;
+    fn decode(e: &cor::Entries<'de>) -> std::io::Result<Self> {
         Ok(Self {
             bool_true: todo!(),
             bool_false: todo!(),
@@ -140,6 +139,6 @@ fn test_all_types() {
     // println!("buf: {:#?}", buf);
 
     let mut reader = &buf[..];
-    let val = cor::parse_struct(&mut reader).unwrap();
+    let val = cor::Entries::parse(&mut reader).unwrap();
     println!("{:#?}", cor::Value::Struct(val));
 }
