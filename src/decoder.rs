@@ -1,18 +1,13 @@
-use crate::{errors, leb128, utils, zig_zag};
+use crate::{
+    entry::{Entries, Entry},
+    errors, leb128, utils, zig_zag,
+};
 
 use super::Result;
 use std::{
     fmt::{self, Debug, Write},
     io,
 };
-
-#[derive(Clone, Debug)]
-pub struct Entry<'de> {
-    key: u32,
-    value: Value<'de>,
-}
-
-type Entries<'de> = Vec<Entry<'de>>;
 
 #[derive(Clone)]
 pub enum Value<'de> {
@@ -80,7 +75,7 @@ impl Debug for Value<'_> {
             Value::List(list) => list.fmt(f),
             Value::Struct(items) => f
                 .debug_map()
-                .entries(items.iter().map(|Entry { key, value }| (key, value)))
+                .entries(items.0.iter().map(|Entry { key, value }| (key, value)))
                 .finish(),
         }
     }
@@ -135,46 +130,49 @@ fn parse_list<'de>(reader: &mut &'de [u8]) -> Result<List<'de>> {
         6 => collect(len, || parse_string(reader)).map(List::Str),
         7 => collect(len, || parse_bytes(reader)).map(List::Bytes),
         8 => collect(len, || parse_list(reader)).map(List::List),
-        9 => collect(len, || parse_struct(reader)).map(List::Struct),
+        9 => collect(len, || Entries::parse(reader)).map(List::Struct),
         op => Err(errors::unknown_opcode(op)),
     }
 }
 
-pub fn parse_struct<'de>(reader: &mut &'de [u8]) -> Result<Vec<Entry<'de>>> {
-    let mut obj = Vec::new();
+impl<'de> Entries<'de> {
+    pub fn parse(reader: &mut &'de [u8]) -> Result<Self> {
+        let mut obj = Vec::new();
 
-    loop {
-        let (key, ty) = decode_field_ty(reader)?;
-        let value = match ty {
-            0 => Ok(Value::Bool(false)),
-            1 => Ok(Value::Bool(true)),
+        loop {
+            let (key, ty) = decode_field_ty(reader)?;
+            let value = match ty {
+                0 => Ok(Value::Bool(false)),
+                1 => Ok(Value::Bool(true)),
 
-            2 => utils::read_buf(reader)
-                .map(f32::from_le_bytes)
-                .map(Value::F32),
+                2 => utils::read_buf(reader)
+                    .map(f32::from_le_bytes)
+                    .map(Value::F32),
 
-            3 => utils::read_buf(reader)
-                .map(f64::from_le_bytes)
-                .map(Value::F64),
+                3 => utils::read_buf(reader)
+                    .map(f64::from_le_bytes)
+                    .map(Value::F64),
 
-            4 => leb128::read_unsigned(reader)
-                .map(zig_zag::from)
-                .map(Value::Int),
+                4 => leb128::read_unsigned(reader)
+                    .map(zig_zag::from)
+                    .map(Value::Int),
 
-            5 => leb128::read_unsigned(reader).map(Value::UInt),
-            6 => parse_string(reader).map(Value::Str),
-            7 => parse_bytes(reader).map(Value::Bytes),
-            8 => parse_list(reader).map(Value::List),
-            9 => parse_struct(reader).map(Value::Struct),
-            10 => {
-                debug_assert!(key == 0);
-                break; // End of struct
-            }
-            op => Err(errors::unknown_opcode(op)),
-        }?;
-        obj.push(Entry { key, value });
+                5 => leb128::read_unsigned(reader).map(Value::UInt),
+                6 => parse_string(reader).map(Value::Str),
+                7 => parse_bytes(reader).map(Value::Bytes),
+                8 => parse_list(reader).map(Value::List),
+                9 => Entries::parse(reader).map(Value::Struct),
+                10 => {
+                    debug_assert!(key == 0);
+                    break; // End of struct
+                }
+                op => Err(errors::unknown_opcode(op)),
+            }?;
+            obj.push(Entry { key, value });
+        }
+
+        Ok(Entries(obj))
     }
-    Ok(obj)
 }
 
 macro_rules! convert {
@@ -220,17 +218,4 @@ convert! {
     UInt => u8
     UInt => u16
     UInt => u32
-}
-
-impl Value<'_> {
-    pub fn try_get<'e, T>(key: u32, entries: &'e Vec<(u32, Self)>) -> Result<Option<T>, T::Error>
-    where
-        T: TryFrom<&'e Self>,
-    {
-        entries
-            .iter()
-            .find_map(|(k, v)| (*k == key).then_some(v))
-            .map(T::try_from)
-            .transpose()
-    }
 }

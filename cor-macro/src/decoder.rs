@@ -1,3 +1,4 @@
+#![allow(warnings)]
 use quote2::{Quote, ToTokens, proc_macro2::TokenStream, quote};
 use syn::DeriveInput;
 
