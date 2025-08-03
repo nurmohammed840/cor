@@ -160,10 +160,7 @@ impl Debug for Value<'_> {
             Value::F64(val) => val.fmt(f),
             Value::Bool(val) => val.fmt(f),
             Value::List(list) => list.fmt(f),
-            Value::Struct(items) => f
-                .debug_map()
-                .entries(items.0.iter().map(|Entry { key, value }| (key, value)))
-                .finish(),
+            Value::Struct(items) => items.fmt(f),
         }
     }
 }

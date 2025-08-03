@@ -1,3 +1,5 @@
+use std::fmt;
+
 use crate::{Value, convert::ConvertFrom, errors};
 
 #[derive(Clone, Debug)]
@@ -6,7 +8,7 @@ pub struct Entry<'de> {
     pub value: Value<'de>,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Default)]
 pub struct Entries<'de>(pub(crate) Vec<Entry<'de>>);
 
 impl<'de> Entries<'de> {
@@ -24,5 +26,13 @@ impl<'de> Entries<'de> {
             err.key = Some(k);
             err
         })
+    }
+}
+
+impl<'de> fmt::Debug for Entries<'de> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_map()
+            .entries(self.0.iter().map(|Entry { key, value }| (key, value)))
+            .finish()
     }
 }
