@@ -1,20 +1,35 @@
 use crate::{List, Value};
-use std::io::{Error, ErrorKind};
+use std::fmt;
 
-pub fn eof() -> Error {
-    Error::new(ErrorKind::UnexpectedEof, "Failed to read field type")
+#[derive(Debug)]
+pub struct UnexpectedEof;
+
+impl std::error::Error for UnexpectedEof {}
+impl fmt::Display for UnexpectedEof {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("unexpected end of file")
+    }
 }
 
-pub fn leb128_err() -> Error {
-    Error::new(ErrorKind::InvalidData, "LEB128 overflow")
+#[derive(Debug)]
+pub struct Leb128Error;
+impl std::error::Error for Leb128Error {}
+impl fmt::Display for Leb128Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("LEB128 decoding error")
+    }
 }
 
-pub fn unknown_opcode(code: u8) -> Error {
-    Error::new(ErrorKind::InvalidData, format!("Unknown opcode: {code}",))
+#[derive(Debug)]
+pub struct UnknownType {
+    pub code: u8,
 }
 
-pub fn invalid_input(err: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> Error {
-    Error::new(ErrorKind::InvalidInput, err)
+impl std::error::Error for UnknownType {}
+impl fmt::Display for UnknownType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "unknown type: {}", self.code)
+    }
 }
 
 impl Value<'_> {
@@ -42,8 +57,53 @@ impl Value<'_> {
         }
     }
 
-    pub(crate) fn invalid_type(&self, expected: &str) -> Error {
-        let error = format!("expected `{expected}`, found `{}`", self.type_name());
-        Error::new(ErrorKind::InvalidInput, error)
+    pub(crate) fn invalid_type(&self, expected: &str) -> ConvertError {
+        ConvertError::new(format!(
+            "expected `{expected}`, found `{}`",
+            self.type_name()
+        ))
+    }
+}
+
+pub struct ConvertError {
+    pub key: Option<u32>,
+    pub error: crate::Error,
+}
+
+impl ConvertError {
+    pub fn new(message: String) -> Self {
+        Self {
+            key: None,
+            error: message.into(),
+        }
+    }
+
+    pub fn from(value: impl Into<crate::Error>) -> Self {
+        Self {
+            key: None,
+            error: value.into(),
+        }
+    }
+}
+
+impl std::error::Error for ConvertError {}
+impl fmt::Display for ConvertError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.key {
+            Some(key) => {
+                write!(f, "conversion error for key `{key}`: {}", self.error)
+            }
+            None => f.write_str(&self.error.to_string()),
+        }
+    }
+}
+impl fmt::Debug for ConvertError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut obj = f.debug_struct("ConvertError");
+        match self.key {
+            Some(key) => obj.field("key", &key).field("message", &self.error),
+            None => obj.field("message", &self.error),
+        }
+        .finish()
     }
 }

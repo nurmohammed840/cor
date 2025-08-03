@@ -50,13 +50,13 @@ pub fn expand(input: &DeriveInput) -> TokenStream {
     let mut t = TokenStream::new();
     quote!(t, {
         impl <#lifetime, #params> ::cor::Decoder<'decode> for #ident #ty_generics #where_clause {
-            fn decode(e: &::cor::Entries<'decode>) -> ::std::io::Result<Self> {
+            fn decode(e: &::cor::Entries<'decode>) -> ::cor::Result<Self> {
                 Ok(Self { #body })
             }
         }
 
         impl <#lifetime, #params> TryFrom<&::cor::Value<'decode>> for #ident #ty_generics #where_clause {
-            type Error = std::io::Error;
+            type Error = ::cor::errors::ConvertError;
             fn try_from(v: &::cor::Value<'decode>) -> Result<Self, Self::Error> {
                 ::cor::__private::convert_into_struct(v)
             }

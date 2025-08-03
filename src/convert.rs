@@ -1,11 +1,10 @@
-use crate::*;
-use std::io;
+use crate::{errors::ConvertError, *};
 
 macro_rules! convert {
     [$($name:ident($ty:ty))*] => [$(
         impl<'de> TryFrom<&Value<'de>> for $ty {
-            type Error = io::Error;
-            fn try_from(val: &Value<'de>) -> Result<Self> {
+            type Error = ConvertError;
+            fn try_from(val: &Value<'de>) -> Result<Self, Self::Error> {
                 match val {
                     Value::$name(val) => Ok(*val),
                     val => Err(val.invalid_type(std::any::type_name::<$ty>())),
@@ -15,10 +14,10 @@ macro_rules! convert {
     )*];
     [$($name:ident => $ty:ty)*] => [$(
         impl TryFrom<&Value<'_>> for $ty {
-            type Error = io::Error;
-            fn try_from(val: &Value) -> Result<Self> {
+            type Error = ConvertError;
+            fn try_from(val: &Value) -> Result<Self, Self::Error> {
                 match val {
-                    Value::$name(val) => <$ty>::try_from(*val).map_err(errors::invalid_input),
+                    Value::$name(val) => <$ty>::try_from(*val).map_err(ConvertError::from),
                     val => Err(val.invalid_type(std::any::type_name::<$ty>())),
                 }
             }
@@ -50,48 +49,43 @@ convert! {
 }
 
 pub trait ConvertFrom<T>: Sized {
-    type Error;
-    fn convert_from(value: T) -> Result<Self, Self::Error>;
+    fn convert_from(value: T) -> Result<Self, errors::ConvertError>;
 }
 
 impl<'v, 'de, T> ConvertFrom<Option<&'v Value<'de>>> for Option<T>
 where
-    T: TryFrom<&'v Value<'de>, Error = io::Error>,
+    T: TryFrom<&'v Value<'de>, Error = ConvertError>,
 {
-    type Error = T::Error;
-
-    fn convert_from(value: Option<&'v Value<'de>>) -> Result<Self> {
+    fn convert_from(value: Option<&'v Value<'de>>) -> Result<Self, errors::ConvertError> {
         value.map(T::try_from).transpose()
     }
 }
 
 impl<'v, 'de, T> ConvertFrom<Option<&'v Value<'de>>> for T
 where
-    T: TryFrom<&'v Value<'de>, Error = io::Error>,
+    T: TryFrom<&'v Value<'de>, Error = ConvertError>,
 {
-    type Error = T::Error;
-
-    fn convert_from(value: Option<&'v Value<'de>>) -> Result<Self> {
+    fn convert_from(value: Option<&'v Value<'de>>) -> Result<Self, errors::ConvertError> {
         match value {
             Some(val) => T::try_from(val),
-            None => {
-                let error = format!("expected `{}`, found `None`", std::any::type_name::<T>());
-                Err(io::Error::new(io::ErrorKind::InvalidInput, error))
-            }
+            None => Err(ConvertError::new(format!(
+                "expected `{}`, found `None`",
+                std::any::type_name::<T>()
+            ))),
         }
     }
 }
 
 #[doc(hidden)]
-pub fn convert_into_struct<'de, T>(val: &Value<'de>) -> Result<T, std::io::Error>
+pub fn convert_into_struct<'de, T>(val: &Value<'de>) -> Result<T, ConvertError>
 where
     T: Decoder<'de>,
 {
     match val {
-        Value::Struct(entries) => T::decode(entries),
-        _ => {
-            let error = format!("expected `{}`, found `None`", std::any::type_name::<T>());
-            Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, error))
-        }
+        Value::Struct(entries) => T::decode(entries).map_err(ConvertError::from),
+        _ => Err(ConvertError::new(format!(
+            "expected `{}`, found `None`",
+            std::any::type_name::<T>()
+        ))),
     }
 }

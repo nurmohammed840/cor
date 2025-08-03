@@ -2,12 +2,12 @@ mod convert;
 mod decoder;
 mod encoder;
 mod entry;
-mod errors;
+pub mod errors;
 mod leb128;
 mod utils;
 mod zig_zag;
 
-use std::io::Write;
+use std::io::{self, Write};
 
 pub use cor_macro::*;
 pub use encoder::FieldEncoder;
@@ -15,7 +15,8 @@ pub use encoder::FieldEncoder;
 pub use decoder::{List, Value};
 pub use entry::{Entries, Entry};
 
-pub type Result<T, E = std::io::Error> = std::result::Result<T, E>;
+pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
+pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[doc(hidden)]
 pub mod __private {
@@ -23,7 +24,7 @@ pub mod __private {
 }
 
 pub trait Encoder {
-    fn encode(&self, _: &mut (impl Write + ?Sized)) -> Result<()>;
+    fn encode(&self, _: &mut (impl Write + ?Sized)) -> io::Result<()>;
 }
 
 pub trait Decoder<'de>: Sized {

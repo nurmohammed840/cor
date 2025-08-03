@@ -1,6 +1,6 @@
-use leb128::*;
-
 use super::*;
+use leb128::*;
+use std::io::Result;
 
 // #[doc(hidden)]
 pub trait FieldEncoder {
@@ -258,4 +258,3 @@ impl<T: Encoder> FieldEncoder for T {
         T::encode(self, writer)
     }
 }
-

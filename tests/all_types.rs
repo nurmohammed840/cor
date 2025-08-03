@@ -1,7 +1,7 @@
 #![allow(warnings)]
 use cor::{Decoder, Encoder};
 
-#[derive(Encoder, Decoder, Clone)]
+#[derive(Encoder, Decoder, Clone, Debug, PartialEq)]
 struct Types<'a> {
     #[key = 1]
     bool_true: bool,
@@ -57,7 +57,7 @@ struct Types<'a> {
     user: User,
 }
 
-#[derive(Encoder, Debug, Decoder, Clone)]
+#[derive(Encoder, Debug, Decoder, Clone, PartialEq)]
 struct User {
     #[key = 0]
     id: Vec<u8>,
@@ -69,7 +69,7 @@ struct User {
 
 #[test]
 fn test_all_types() {
-    let types = Types {
+    let all_types = Types {
         bool_true: true,
         bool_false: false,
 
@@ -107,10 +107,13 @@ fn test_all_types() {
     };
 
     let mut buf = Vec::new();
-    types.encode(&mut buf).unwrap();
-    // println!("buf: {:#?}", buf);
+    all_types.encode(&mut buf).unwrap();
 
     let mut reader = &buf[..];
-    let val = cor::Entries::parse(&mut reader).unwrap();
-    println!("{:#?}", cor::Value::Struct(val));
+    let entries = cor::Entries::parse(&mut reader).unwrap();
+    let new_all_types = Types::decode(&entries);
+
+    // println!("{:#?}", cor::Value::Struct(entries));
+
+    assert_eq!(all_types, new_all_types.unwrap());
 }

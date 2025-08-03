@@ -1,4 +1,4 @@
-use crate::{Value, convert::ConvertFrom};
+use crate::{Value, convert::ConvertFrom, errors};
 
 #[derive(Clone, Debug)]
 pub struct Entry<'de> {
@@ -16,11 +16,13 @@ impl<'de> Entries<'de> {
             .find_map(|Entry { key, value }| (*key == k).then_some(value))
     }
 
-    #[allow(private_bounds, private_interfaces)]
-    pub fn get_and_convert<'v, T>(&'v self, k: u32) -> Result<T, T::Error>
+    pub fn get_and_convert<'v, T>(&'v self, k: u32) -> Result<T, errors::ConvertError>
     where
         T: ConvertFrom<Option<&'v Value<'de>>>,
     {
-        T::convert_from(self.get(k))
+        T::convert_from(self.get(k)).map_err(|mut err| {
+            err.key = Some(k);
+            err
+        })
     }
 }

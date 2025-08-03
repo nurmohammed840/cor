@@ -1,10 +1,7 @@
 use crate::*;
 
 use super::Result;
-use std::{
-    fmt::{self, Debug, Write},
-    io,
-};
+use std::fmt::{self, Debug, Write};
 
 #[derive(Clone)]
 pub enum Value<'de> {
@@ -47,14 +44,11 @@ fn decode_field_ty(reader: &mut &[u8]) -> Result<(u32, u8)> {
 }
 
 fn try_into_u32(num: u64) -> Result<u32> {
-    num.try_into()
-        .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "number out of range"))
+    Ok(num.try_into()?)
 }
 
 fn parse_str<'de>(reader: &mut &'de [u8]) -> Result<&'de str> {
-    parse_bytes(reader)
-        .map(str::from_utf8)?
-        .map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))
+    Ok(str::from_utf8(parse_bytes(reader)?)?)
 }
 
 fn parse_bytes<'de>(reader: &mut &'de [u8]) -> Result<&'de [u8]> {
@@ -82,7 +76,7 @@ fn parse_list<'de>(reader: &mut &'de [u8]) -> Result<List<'de>> {
         7 => collect(len, || parse_bytes(reader)).map(List::Bytes),
         8 => collect(len, || parse_list(reader)).map(List::List),
         9 => collect(len, || Entries::parse(reader)).map(List::Struct),
-        op => Err(errors::unknown_opcode(op)),
+        code => Err(errors::UnknownType { code }.into()),
     }
 }
 
@@ -117,7 +111,7 @@ impl<'de> Entries<'de> {
                     debug_assert!(key == 0);
                     break; // End of struct
                 }
-                op => Err(errors::unknown_opcode(op)),
+                code => Err(errors::UnknownType { code }.into()),
             }?;
             obj.push(Entry { key, value });
         }
