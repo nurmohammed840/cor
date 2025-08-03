@@ -1,7 +1,7 @@
 #![allow(warnings)]
-use cor::Encoder;
+use cor::{Decoder, Encoder};
 
-#[derive(Encoder, Clone)]
+#[derive(Encoder, Decoder, Clone)]
 struct Types<'a> {
     #[key = 1]
     bool_true: bool,
@@ -57,35 +57,7 @@ struct Types<'a> {
     user: User,
 }
 
-impl<'de> cor::Decoder<'de> for Types<'de> {
-    fn decode(e: &cor::Entries<'de>) -> std::io::Result<Self> {
-        Ok(Self {
-            bool_true: todo!(),
-            bool_false: todo!(),
-            u16_min: todo!(),
-            u16_max: todo!(),
-            i16_min: todo!(),
-            i16_max: todo!(),
-            u32_min: todo!(),
-            u32_max: todo!(),
-            i32_min: todo!(),
-            i32_max: todo!(),
-            u64_min: todo!(),
-            u64_max: todo!(),
-            i64_min: todo!(),
-            i64_max: todo!(),
-            f32_min: todo!(),
-            f32_max: todo!(),
-            f64_min: todo!(),
-            f64_max: todo!(),
-            string: todo!(),
-            bytes: todo!(),
-            user: todo!(),
-        })
-    }
-}
-
-#[derive(Encoder, Debug, Clone)]
+#[derive(Encoder, Debug, Decoder, Clone)]
 struct User {
     #[key = 0]
     id: Vec<u8>,

@@ -51,8 +51,6 @@ convert! {
 
 pub trait ConvertFrom<T>: Sized {
     type Error;
-
-    // Required method
     fn convert_from(value: T) -> Result<Self, Self::Error>;
 }
 
@@ -66,7 +64,6 @@ where
         value.map(T::try_from).transpose()
     }
 }
-
 
 impl<'v, 'de, T> ConvertFrom<Option<&'v Value<'de>>> for T
 where
@@ -85,13 +82,16 @@ where
     }
 }
 
-// impl<'v, 'de, T> ConvertFrom<Option<&'v Value<'de>>> for T
-// where
-//     T: Decoder<'de>,
-// {
-//     type Error = ();
-
-//     fn convert_from(value: Option<&'v Value<'de>>) -> Result<Self, ()> {
-//         todo!()
-//     }
-// }
+#[doc(hidden)]
+pub fn convert_into_struct<'de, T>(val: &Value<'de>) -> Result<T, std::io::Error>
+where
+    T: Decoder<'de>,
+{
+    match val {
+        Value::Struct(entries) => T::decode(entries),
+        _ => {
+            let error = format!("expected `{}`, found `None`", std::any::type_name::<T>());
+            Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, error))
+        }
+    }
+}

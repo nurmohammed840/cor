@@ -5,13 +5,13 @@ use quote2::{
     proc_macro2::{Punct, Spacing, TokenStream},
     quote,
 };
-use syn::{Data, DataStruct, DeriveInput, Error, Expr, Field, Meta, Type, spanned::Spanned};
+use syn::{spanned::Spanned, *};
 
-pub fn expand(input: DeriveInput) -> TokenStream {
+pub fn expand(input: &DeriveInput) -> TokenStream {
     let DeriveInput {
         ident,
         generics,
-        ref data,
+        data,
         ..
     } = input;
 
@@ -20,7 +20,7 @@ pub fn expand(input: DeriveInput) -> TokenStream {
             let mut seen: HashSet<&Expr> = HashSet::new();
 
             for field in fields {
-                if let Some(key) = get_key(field) {
+                if let Some(key) = crate::utils::get_key(field) {
                     match seen.get(key) {
                         Some(key1) => {
                             let mut err = Error::new(key1.span(), "duplicate key");
@@ -68,11 +68,4 @@ pub fn expand(input: DeriveInput) -> TokenStream {
         }
     });
     t
-}
-
-fn get_key(field: &Field) -> Option<&Expr> {
-    field.attrs.iter().find_map(|attr| match &attr.meta {
-        Meta::NameValue(kv) => kv.path.is_ident("key").then_some(&kv.value),
-        _ => None,
-    })
 }

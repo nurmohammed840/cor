@@ -1,3 +1,4 @@
+mod convert;
 mod decoder;
 mod encoder;
 mod entry;
@@ -5,7 +6,6 @@ mod errors;
 mod leb128;
 mod utils;
 mod zig_zag;
-mod convert;
 
 use std::io::Write;
 
@@ -16,6 +16,11 @@ pub use decoder::{List, Value};
 pub use entry::{Entries, Entry};
 
 pub type Result<T, E = std::io::Error> = std::result::Result<T, E>;
+
+#[doc(hidden)]
+pub mod __private {
+    pub use crate::convert::convert_into_struct;
+}
 
 pub trait Encoder {
     fn encode(&self, _: &mut (impl Write + ?Sized)) -> Result<()>;
