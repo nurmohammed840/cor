@@ -18,11 +18,6 @@ pub use entry::{Entries, Entry};
 pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
-#[doc(hidden)]
-pub mod __private {
-    pub use crate::convert::convert_into_struct;
-}
-
 pub trait Encoder {
     fn encode(&self, _: &mut (impl Write + ?Sized)) -> io::Result<()>;
 }

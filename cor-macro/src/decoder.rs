@@ -54,14 +54,6 @@ pub fn expand(input: &DeriveInput) -> TokenStream {
                 Ok(Self { #body })
             }
         }
-
-        impl <#lifetime, #params> TryFrom<&::cor::Value<'decode>> for #ident #ty_generics #where_clause {
-            type Error = ::cor::errors::ConvertError;
-            fn try_from(v: &::cor::Value<'decode>) -> Result<Self, Self::Error> {
-                ::cor::__private::convert_into_struct(v)
-            }
-        }
-
     });
     t
 }

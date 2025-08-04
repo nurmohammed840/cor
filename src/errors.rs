@@ -32,6 +32,22 @@ impl fmt::Display for UnknownType {
     }
 }
 
+impl List<'_> {
+    fn type_name(&self) -> &str {
+        match self {
+            List::Bool(_) => "[boolean]",
+            List::F32(_) => "[f32]",
+            List::F64(_) => "[f64]",
+            List::Int(_) => "[integer]",
+            List::UInt(_) => "[unsigned integer]",
+            List::Str(_) => "[string]",
+            List::Bytes(_) => "[bytes]",
+            List::Struct(_) => "[struct]",
+            List::List(_) => "[...]",
+        }
+    }
+}
+
 impl Value<'_> {
     fn type_name(&self) -> &str {
         match self {
@@ -43,17 +59,7 @@ impl Value<'_> {
             Value::Str(_) => "string",
             Value::Bytes(_) => "bytes",
             Value::Struct(_) => "struct",
-            Value::List(list) => match list {
-                List::Bool(_) => "[boolean]",
-                List::F32(_) => "[f32]",
-                List::F64(_) => "[f64]",
-                List::Int(_) => "[integer]",
-                List::UInt(_) => "[unsigned integer]",
-                List::Str(_) => "[string]",
-                List::Bytes(_) => "[bytes]",
-                List::Struct(_) => "[struct]",
-                List::List(_) => "[...]",
-            },
+            Value::List(list) => list.type_name(),
         }
     }
 
