@@ -21,6 +21,26 @@ impl fmt::Display for Leb128Error {
 }
 
 #[derive(Debug)]
+pub struct ParseError {
+    pub message: Box<str>,
+}
+
+impl std::error::Error for ParseError {}
+impl fmt::Display for ParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self, f)
+    }
+}
+
+impl ParseError {
+    pub fn new(message: impl Into<Box<str>>) -> Self {
+        Self {
+            message: message.into(),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct UnknownType {
     pub code: u8,
 }
@@ -45,6 +65,13 @@ impl List<'_> {
             List::Struct(_) => "[struct]",
             List::List(_) => "[...]",
         }
+    }
+
+    pub(crate) fn invalid_type(&self, expected: &str) -> ConvertError {
+        ConvertError::new(format!(
+            "expected `{expected}`, found `{}`",
+            self.type_name()
+        ))
     }
 }
 

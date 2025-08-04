@@ -57,7 +57,7 @@ struct Types<'a> {
     user: User,
 
     // ----
-    // #[key = 22]
+    #[key = 22]
     arr_bool: Vec<bool>,
 }
 
@@ -114,14 +114,15 @@ fn test_all_types() {
 
     let mut buf = Vec::new();
     all_types.encode(&mut buf).unwrap();
+    // println!("reader: {:#?}", buf);
 
     let mut reader = &buf[..];
+
     let entries = cor::Entries::parse(&mut reader).unwrap();
     let new_all_types = Types::decode(&entries);
 
     println!("{:#?}", cor::Value::Struct(entries));
 
-    println!("new_all_types: {:#?}", new_all_types);
-
-    // assert_eq!(all_types, new_all_types.unwrap());
+    // println!("{:#?}", new_all_types.as_ref().unwrap());
+    assert_eq!(all_types, new_all_types.unwrap());
 }

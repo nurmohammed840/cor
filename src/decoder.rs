@@ -67,7 +67,12 @@ fn collect<T>(len: u32, mut f: impl FnMut() -> Result<T>) -> Result<Vec<T>> {
 fn parse_list<'de>(reader: &mut &'de [u8]) -> Result<List<'de>> {
     let (len, ty) = decode_field_ty(reader)?;
     match ty {
-        0 | 1 => collect(len, || Ok(utils::read_byte(reader)? != 0)).map(List::Bool),
+        0 | 1 => collect(len, || match utils::read_byte(reader)? {
+            0 => Ok(false),
+            1 => Ok(true),
+            v => Err(errors::ParseError::new(format!("invalid boolean value: `{}`", v)).into()),
+        })
+        .map(List::Bool),
         2 => collect(len, || utils::read_buf(reader).map(f32::from_le_bytes)).map(List::F32),
         3 => collect(len, || utils::read_buf(reader).map(f64::from_le_bytes)).map(List::F64),
         4 => collect(len, || leb128::read_unsigned(reader).map(zig_zag::from)).map(List::Int),

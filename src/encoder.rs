@@ -145,8 +145,8 @@ impl Item for bool {
 
     fn encode(&self, writer: &mut (impl Write + ?Sized)) -> Result<()> {
         writer.write_all(&[match self {
-            false => 1,
-            true => 2,
+            false => 0,
+            true => 1,
         }])
     }
 }
