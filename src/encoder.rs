@@ -1,13 +1,13 @@
 use super::*;
-use leb128::*;
+use varint::*;
 use std::io::Result;
 
-// #[doc(hidden)]
 pub trait FieldEncoder {
     fn encode(&self, writer: &mut (impl Write + ?Sized), id: u32) -> Result<()>;
 }
 
 impl<T: FieldEncoder> FieldEncoder for Option<T> {
+    #[inline]
     fn encode(&self, writer: &mut (impl Write + ?Sized), id: u32) -> Result<()> {
         match self {
             Some(val) => FieldEncoder::encode(val, writer, id),
@@ -30,7 +30,7 @@ fn encode_field_ty(writer: &mut (impl Write + ?Sized), id: u32, ty: u8) -> Resul
 }
 
 fn encode_len_u32(writer: &mut (impl Write + ?Sized), len: usize) -> Result<()> {
-    let len: u32 = len.try_into().unwrap();
+    let len: u32 = u32_list_len(len)?;
     let mut buf = Leb128Buf::<8>::new();
     buf.write_u32(len);
     writer.write_all(buf.as_bytes())
@@ -133,6 +133,73 @@ impl_for! {
 
 // ----------------------------------------------
 
+fn u32_list_len(len: usize) -> Result<u32> {
+    u32::try_from(len).map_err(io::Error::other)
+}
+
+impl<'de, T> FieldEncoder for T
+where
+    T: IntoValue<'de>,
+{
+    fn encode(&self, writer: &mut (impl Write + ?Sized), id: u32) -> Result<()> {
+        Value::encode(&self.to_value(), writer, id)
+    }
+}
+
+impl FieldEncoder for Entries<'_> {
+    fn encode(&self, writer: &mut (impl Write + ?Sized), id: u32) -> Result<()> {
+        encode_field_ty(writer, id, 9)?;
+
+        for Entry { key, value } in self.iter() {
+            Value::encode(value, writer, *key)?;
+        }
+        writer.write_all(&[10])
+    }
+}
+
+impl FieldEncoder for Value<'_> {
+    fn encode(&self, writer: &mut (impl Write + ?Sized), id: u32) -> Result<()> {
+        match self {
+            Value::Bool(val) => FieldEncoder::encode(val, writer, id),
+            Value::F32(val) => FieldEncoder::encode(val, writer, id),
+            Value::F64(val) => FieldEncoder::encode(val, writer, id),
+            Value::Int(val) => FieldEncoder::encode(val, writer, id),
+            Value::UInt(val) => FieldEncoder::encode(val, writer, id),
+            Value::Str(val) => FieldEncoder::encode(*val, writer, id),
+            Value::Bytes(val) => FieldEncoder::encode(*val, writer, id),
+            Value::List(list) => FieldEncoder::encode(list, writer, id),
+            Value::Struct(entries) => FieldEncoder::encode(entries, writer, id),
+        }
+    }
+}
+
+impl FieldEncoder for List<'_> {
+    fn encode(&self, writer: &mut (impl Write + ?Sized), id: u32) -> Result<()> {
+        match self {
+            List::Bool(items) => FieldEncoder::encode(items, writer, id),
+            List::F32(items) => FieldEncoder::encode(items, writer, id),
+            List::F64(items) => FieldEncoder::encode(items, writer, id),
+            List::Int(items) => FieldEncoder::encode(items, writer, id),
+            List::UInt(items) => FieldEncoder::encode(items, writer, id),
+            List::Str(items) => FieldEncoder::encode(items, writer, id),
+            List::Bytes(items) => FieldEncoder::encode(items, writer, id),
+            List::List(lists) => FieldEncoder::encode(lists, writer, id),
+            List::Struct(items) => FieldEncoder::encode(items, writer, id),
+        }
+    }
+}
+
+pub fn encode_struct_field<T: Encoder>(
+    this: &T,
+    writer: &mut (impl Write + ?Sized),
+    id: u32,
+) -> Result<()> {
+    encode_field_ty(writer, id, 9)?;
+    T::encode(this, writer)
+}
+
+// ----------------------------------------------
+
 trait Item {
     fn ty() -> u8;
     fn encode(&self, writer: &mut (impl Write + ?Sized)) -> Result<()>;
@@ -196,7 +263,7 @@ macro_rules! impl_item {
 impl_item! { @sign: i16, i32, i64 }
 impl_item! { @unsign: u16, u32, u64 }
 
-impl Item for str {
+impl Item for &str {
     fn ty() -> u8 {
         6
     }
@@ -208,7 +275,7 @@ impl Item for str {
     }
 }
 
-impl Item for [u8] {
+impl Item for &[u8] {
     fn ty() -> u8 {
         7
     }
@@ -218,11 +285,53 @@ impl Item for [u8] {
     }
 }
 
+impl Item for List<'_> {
+    fn ty() -> u8 {
+        8
+    }
+
+    fn encode(&self, writer: &mut (impl Write + ?Sized)) -> Result<()> {
+        match self {
+            List::Bool(items) => items.iter().try_for_each(|el| Item::encode(el, writer)),
+            List::F32(items) => items.iter().try_for_each(|el| Item::encode(el, writer)),
+            List::F64(items) => items.iter().try_for_each(|el| Item::encode(el, writer)),
+            List::Int(items) => items.iter().try_for_each(|el| Item::encode(el, writer)),
+            List::UInt(items) => items.iter().try_for_each(|el| Item::encode(el, writer)),
+            List::Str(items) => items.iter().try_for_each(|el| Item::encode(el, writer)),
+            List::Bytes(items) => items.iter().try_for_each(|el| Item::encode(el, writer)),
+            List::List(lists) => lists.iter().try_for_each(|el| Item::encode(el, writer)),
+            List::Struct(items) => items.iter().try_for_each(|el| Item::encode(el, writer)),
+        }
+    }
+}
+
+impl Item for Entries<'_> {
+    fn ty() -> u8 {
+        9
+    }
+
+    fn encode(&self, writer: &mut (impl Write + ?Sized)) -> Result<()> {
+        for Entry { key, value } in self.iter() {
+            Value::encode(value, writer, *key)?;
+        }
+        writer.write_all(&[10])
+    }
+}
+
 impl<T: Item> Item for Vec<T> {
     fn ty() -> u8 {
         8
     }
+
     fn encode(&self, writer: &mut (impl Write + ?Sized)) -> Result<()> {
+        // +--------+--------+...+--------+
+        // |sssstttt| elements            |
+        // +--------+--------+...+--------+
+        // Compact protocol list header (2+ bytes, long form) and elements:
+        // +--------+--------+...+--------+--------+...+--------+
+        // |1111tttt| size                | elements            |
+        // +--------+--------+...+--------+--------+...+--------+
+        encode_field_ty(writer, u32_list_len(self.len())?, T::ty())?;
         self.iter().try_for_each(|el| T::encode(el, writer))
     }
 }
@@ -247,14 +356,7 @@ impl<T: Item> FieldEncoder for Vec<T> {
         // +--------+--------+...+--------+--------+...+--------+
         // |1111tttt| size                | elements            |
         // +--------+--------+...+--------+--------+...+--------+
-        encode_field_ty(writer, self.len().try_into().unwrap(), T::ty())?;
+        encode_field_ty(writer, u32_list_len(self.len())?, T::ty())?;
         self.iter().try_for_each(|el| T::encode(el, writer))
-    }
-}
-
-impl<T: Encoder> FieldEncoder for T {
-    fn encode(&self, writer: &mut (impl Write + ?Sized), id: u32) -> Result<()> {
-        encode_field_ty(writer, id, 9)?;
-        T::encode(self, writer)
     }
 }

@@ -1,5 +1,3 @@
-use std::fmt;
-
 use crate::{Value, convert::ConvertFrom, errors};
 
 #[derive(Clone, Debug)]
@@ -27,12 +25,8 @@ impl<'de> Entries<'de> {
             err
         })
     }
-}
 
-impl<'de> fmt::Debug for Entries<'de> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_map()
-            .entries(self.0.iter().map(|Entry { key, value }| (key, value)))
-            .finish()
+    pub(crate) fn iter(&self) -> &[Entry<'de>] {
+        &self.0
     }
 }

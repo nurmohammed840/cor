@@ -92,7 +92,6 @@ where
 
 // -------------------------------------------------------------------------
 
-
 impl<'v, 'de, T> ConvertFrom<&'v Value<'de>> for Vec<T>
 where
     T: ConvertFrom<&'v List<'de>>,
@@ -155,9 +154,6 @@ macro_rules! convert_from_list {
         )*
     };
 }
-
-
-
 
 convert_from_list! {
     Bool -> Vec<bool>

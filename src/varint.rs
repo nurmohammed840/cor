@@ -63,7 +63,7 @@ pub fn read_unsigned(reader: &mut &[u8]) -> Result<u64> {
             break Ok(result); // No continuation bit, end of LEB128
         }
         if shift >= 64 {
-            return Err(errors::Leb128Error.into());
+            return Err(errors::VarIntError.into());
         }
         shift += 7;
     }

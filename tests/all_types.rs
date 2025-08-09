@@ -117,7 +117,6 @@ fn test_all_types() {
     // println!("reader: {:#?}", buf);
 
     let mut reader = &buf[..];
-
     let entries = cor::Entries::parse(&mut reader).unwrap();
     let new_all_types = Types::decode(&entries);
 

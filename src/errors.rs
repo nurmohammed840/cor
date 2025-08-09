@@ -3,7 +3,6 @@ use std::fmt;
 
 #[derive(Debug)]
 pub struct UnexpectedEof;
-
 impl std::error::Error for UnexpectedEof {}
 impl fmt::Display for UnexpectedEof {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -12,11 +11,11 @@ impl fmt::Display for UnexpectedEof {
 }
 
 #[derive(Debug)]
-pub struct Leb128Error;
-impl std::error::Error for Leb128Error {}
-impl fmt::Display for Leb128Error {
+pub struct VarIntError;
+impl std::error::Error for VarIntError {}
+impl fmt::Display for VarIntError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("LEB128 decoding error")
+        f.write_str("invalid variable-length integer")
     }
 }
 

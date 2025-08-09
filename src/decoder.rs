@@ -1,33 +1,6 @@
 use crate::*;
 
 use super::Result;
-use std::fmt::{self, Debug, Write};
-
-#[derive(Clone)]
-pub enum Value<'de> {
-    Bool(bool),
-    F32(f32),
-    F64(f64),
-    Int(i64),
-    UInt(u64),
-    Str(&'de str),
-    Bytes(&'de [u8]),
-    List(List<'de>),
-    Struct(Entries<'de>),
-}
-
-#[derive(Clone)]
-pub enum List<'de> {
-    Bool(Vec<bool>),
-    F32(Vec<f32>),
-    F64(Vec<f64>),
-    Int(Vec<i64>),
-    UInt(Vec<u64>),
-    Str(Vec<&'de str>),
-    Bytes(Vec<&'de [u8]>),
-    List(Vec<List<'de>>),
-    Struct(Vec<Entries<'de>>),
-}
 
 fn decode_field_ty(reader: &mut &[u8]) -> Result<(u32, u8)> {
     let byte = utils::read_byte(reader)?;
@@ -36,7 +9,7 @@ fn decode_field_ty(reader: &mut &[u8]) -> Result<(u32, u8)> {
     let id = (byte >> 4) as u32;
 
     let id = if id == 0b1111 {
-        try_into_u32(leb128::read_unsigned(reader)? + 15)?
+        try_into_u32(varint::read_unsigned(reader)? + 15)?
     } else {
         id
     };
@@ -52,7 +25,7 @@ fn parse_str<'de>(reader: &mut &'de [u8]) -> Result<&'de str> {
 }
 
 fn parse_bytes<'de>(reader: &mut &'de [u8]) -> Result<&'de [u8]> {
-    let len = leb128::read_unsigned(reader).map(try_into_u32)??;
+    let len = varint::read_unsigned(reader).map(try_into_u32)??;
     utils::read_bytes(reader, len as usize)
 }
 
@@ -75,8 +48,8 @@ fn parse_list<'de>(reader: &mut &'de [u8]) -> Result<List<'de>> {
         .map(List::Bool),
         2 => collect(len, || utils::read_buf(reader).map(f32::from_le_bytes)).map(List::F32),
         3 => collect(len, || utils::read_buf(reader).map(f64::from_le_bytes)).map(List::F64),
-        4 => collect(len, || leb128::read_unsigned(reader).map(zig_zag::from)).map(List::Int),
-        5 => collect(len, || leb128::read_unsigned(reader)).map(List::UInt),
+        4 => collect(len, || varint::read_unsigned(reader).map(zig_zag::from)).map(List::Int),
+        5 => collect(len, || varint::read_unsigned(reader)).map(List::UInt),
         6 => collect(len, || parse_str(reader)).map(List::Str),
         7 => collect(len, || parse_bytes(reader)).map(List::Bytes),
         8 => collect(len, || parse_list(reader)).map(List::List),
@@ -103,11 +76,11 @@ impl<'de> Entries<'de> {
                     .map(f64::from_le_bytes)
                     .map(Value::F64),
 
-                4 => leb128::read_unsigned(reader)
+                4 => varint::read_unsigned(reader)
                     .map(zig_zag::from)
                     .map(Value::Int),
 
-                5 => leb128::read_unsigned(reader).map(Value::UInt),
+                5 => varint::read_unsigned(reader).map(Value::UInt),
                 6 => parse_str(reader).map(Value::Str),
                 7 => parse_bytes(reader).map(Value::Bytes),
                 8 => parse_list(reader).map(Value::List),
@@ -122,50 +95,5 @@ impl<'de> Entries<'de> {
         }
 
         Ok(Entries(obj))
-    }
-}
-
-// --------------------------------------------------------------
-
-impl Debug for List<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Bool(val) => Debug::fmt(val, f),
-            Self::F32(val) => Debug::fmt(val, f),
-            Self::F64(val) => Debug::fmt(val, f),
-            Self::Int(val) => Debug::fmt(val, f),
-            Self::UInt(val) => Debug::fmt(val, f),
-            Self::Str(val) => Debug::fmt(val, f),
-            Self::Bytes(val) => Debug::fmt(val, f),
-            Self::List(val) => Debug::fmt(val, f),
-            Self::Struct(val) => Debug::fmt(val, f),
-        }
-    }
-}
-
-impl Debug for Value<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Value::Int(val) => val.fmt(f),
-            Value::UInt(val) => write!(f, "{val}u",),
-            Value::Str(val) => val.fmt(f),
-            Value::Bytes(bytes) => {
-                f.write_char('(')?;
-                let mut bytes = bytes.iter().peekable();
-                while let Some(byte) = bytes.next() {
-                    if bytes.peek().is_some() {
-                        write!(f, "{byte} ")?;
-                    } else {
-                        write!(f, "{byte}")?;
-                    }
-                }
-                f.write_char(')')
-            }
-            Value::F32(val) => write!(f, "{val:#?}f"),
-            Value::F64(val) => val.fmt(f),
-            Value::Bool(val) => val.fmt(f),
-            Value::List(list) => list.fmt(f),
-            Value::Struct(items) => items.fmt(f),
-        }
     }
 }
