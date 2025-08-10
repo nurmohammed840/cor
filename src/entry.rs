@@ -26,6 +26,10 @@ impl<'de> Entries<'de> {
         })
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
     pub(crate) fn iter(&self) -> &[Entry<'de>] {
         &self.0
     }

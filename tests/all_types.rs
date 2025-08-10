@@ -115,15 +115,23 @@ impl<'a> Types<'a> {
             arr_bool: vec![true, false],
         }
     }
+
+    fn to_bytes(&self) -> Vec<u8> {
+        let mut buf = Vec::new();
+        self.encode(&mut buf).unwrap();
+        buf
+    }
+
+    fn from_bytes(mut buf: &'a [u8]) -> cor::Result<Self> {
+        Self::decode(&cor::Entries::parse(&mut buf)?)
+    }
 }
 
 #[test]
 fn test_all_types() {
     let all_types = Types::new();
 
-    let mut buf = Vec::new();
-    all_types.encode(&mut buf).unwrap();
-    // println!("reader: {:#?}", buf);
+    let buf = all_types.to_bytes();
 
     let mut reader = &buf[..];
     let entries = cor::Entries::parse(&mut reader).unwrap();
@@ -134,26 +142,59 @@ fn test_all_types() {
     assert_eq!(all_types, new_all_types.unwrap());
 }
 
+// ---------------------------------------------------------------------------------------
+
+#[bench]
+fn bench_encode_parse_and_decode(b: &mut Bencher) {
+    let all_types = Types::new();
+    b.iter(|| {
+        let buf = all_types.to_bytes();
+        let res = Types::from_bytes(&buf[..]);
+        assert!(res.is_ok());
+    });
+}
+
 #[bench]
 fn bench_encode(b: &mut Bencher) {
     let all_types = Types::new();
     b.iter(|| {
-        let mut buf = Vec::new();
-        all_types.encode(&mut buf).unwrap();
+        let buf = all_types.to_bytes();
         assert!(!buf.is_empty());
+    });
+}
+
+#[bench]
+fn bench_parse_and_decode(b: &mut Bencher) {
+    let all_types = Types::new();
+    let buf = all_types.to_bytes();
+
+    b.iter(|| {
+        let res = Types::from_bytes(&buf[..]);
+        assert!(res.is_ok());
+    });
+}
+
+#[bench]
+fn bench_parse(b: &mut Bencher) {
+    let all_types = Types::new();
+    let buf = all_types.to_bytes();
+
+    b.iter(|| {
+        let mut reader = &buf[..];
+        let entries = cor::Entries::parse(&mut reader).unwrap();
+        assert!(!entries.is_empty());
     });
 }
 
 #[bench]
 fn bench_decode(b: &mut Bencher) {
     let all_types = Types::new();
+    let buf = all_types.to_bytes();
 
-    let mut buf = Vec::new();
-    all_types.encode(&mut buf).unwrap();
+    let mut reader = &buf[..];
+    let entries = cor::Entries::parse(&mut reader).unwrap();
 
     b.iter(|| {
-        let mut reader = &buf[..];
-        let entries = cor::Entries::parse(&mut reader).unwrap();
         let all_types = Types::decode(&entries);
         assert!(all_types.is_ok());
     });
