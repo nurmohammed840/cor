@@ -1,6 +1,12 @@
 use super::*;
 use std::fmt::{self, Debug, Write};
 
+impl std::fmt::Display for Value<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Debug::fmt(self, f)
+    }
+}
+
 impl Debug for Value<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -47,7 +53,7 @@ impl Debug for List<'_> {
 impl<'de> fmt::Debug for Entries<'de> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_map()
-            .entries(self.0.iter().map(|Entry { key, value }| (key, value)))
+            .entries(self.0.iter().map(|(key, value)| (key, value)))
             .finish()
     }
 }

@@ -170,10 +170,12 @@ convert_from_list! {
     // UInt => Vec<u8>
     UInt => Vec<u16>
     UInt => Vec<u32>
+    UInt => Vec<u64>
 
     Int => Vec<i8>
     Int => Vec<i16>
     Int => Vec<i32>
+    Int => Vec<i64>
 }
 
 impl<'v, 'de, T> ConvertFrom<&'v List<'de>> for Vec<T>

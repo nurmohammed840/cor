@@ -1,8 +1,9 @@
 #![feature(test)]
 
 extern crate test;
-use cor::{Decoder, Encoder};
 use test::Bencher;
+
+use cor::{Decoder, Encoder, Entries};
 
 #[derive(Encoder, Decoder, Clone, Debug, PartialEq)]
 struct Types<'a> {
@@ -62,6 +63,36 @@ struct Types<'a> {
     // ---------------
     #[key = 22]
     arr_bool: Vec<bool>,
+
+    #[key = 23]
+    arr_i8: Vec<i8>,
+    #[key = 24]
+    arr_i16: Vec<i16>,
+    #[key = 25]
+    arr_i32: Vec<i32>,
+    #[key = 26]
+    arr_i64: Vec<i64>,
+
+    #[key = 27]
+    arr_u8: Vec<u8>,
+    #[key = 28]
+    arr_u16: Vec<u16>,
+    #[key = 29]
+    arr_u32: Vec<u32>,
+    #[key = 30]
+    arr_u64: Vec<u64>,
+
+    #[key = 31]
+    arr_f32: Vec<f32>,
+
+    #[key = 32]
+    arr_f64: Vec<f64>,
+
+    #[key = 33]
+    matrix_2d: Vec<Vec<f32>>,
+
+    #[key = 34]
+    matrixs: Vec<Vec<Vec<f32>>>,
 }
 
 #[derive(Encoder, Debug, Decoder, Clone, PartialEq)]
@@ -80,19 +111,19 @@ impl<'a> Types<'a> {
             bool_true: true,
             bool_false: false,
 
-            u16_min: 0,
+            u16_min: u16::MIN,
             u16_max: u16::MAX,
 
             i16_min: i16::MIN,
             i16_max: i16::MAX,
 
-            u32_min: 0,
+            u32_min: u32::MIN,
             u32_max: u32::MAX,
 
             i32_min: i32::MIN,
             i32_max: i32::MAX,
 
-            u64_min: 0,
+            u64_min: u64::MIN,
             u64_max: u64::MAX,
 
             i64_min: i64::MIN,
@@ -113,6 +144,24 @@ impl<'a> Types<'a> {
             },
 
             arr_bool: vec![true, false],
+            arr_i8: vec![i8::MIN, 0, i8::MAX],
+            arr_i16: vec![i16::MIN, 0, i16::MAX],
+            arr_i32: vec![i32::MIN, 0, i32::MAX],
+            arr_i64: vec![i64::MIN, 0, i64::MAX],
+
+            arr_u8: vec![u8::MIN, u8::MAX / 2, u8::MAX],
+            arr_u16: vec![u16::MIN, u16::MAX / 2, u16::MAX],
+            arr_u32: vec![u32::MIN, u32::MAX / 2, u32::MAX],
+            arr_u64: vec![u64::MIN, u64::MAX / 2, u64::MAX],
+
+            arr_f32: vec![f32::MIN, 0., f32::MAX],
+            arr_f64: vec![f64::MIN, 0., f64::MAX],
+
+            matrix_2d: vec![vec![0., 1.], vec![1., 0.]],
+            matrixs: vec![
+                vec![vec![0., 1.], vec![1., 0.]],
+                vec![vec![1., 0.], vec![0., 1.]],
+            ],
         }
     }
 
@@ -123,7 +172,7 @@ impl<'a> Types<'a> {
     }
 
     fn from_bytes(mut buf: &'a [u8]) -> cor::Result<Self> {
-        Self::decode(&cor::Entries::parse(&mut buf)?)
+        Self::decode(&Entries::parse(&mut buf)?)
     }
 }
 
@@ -134,7 +183,7 @@ fn test_all_types() {
     let buf = all_types.to_bytes();
 
     let mut reader = &buf[..];
-    let entries = cor::Entries::parse(&mut reader).unwrap();
+    let entries = Entries::parse(&mut reader).unwrap();
     let new_all_types = Types::decode(&entries);
 
     // println!("{:#?}", new_all_types);
@@ -143,16 +192,6 @@ fn test_all_types() {
 }
 
 // ---------------------------------------------------------------------------------------
-
-#[bench]
-fn bench_encode_parse_and_decode(b: &mut Bencher) {
-    let all_types = Types::new();
-    b.iter(|| {
-        let buf = all_types.to_bytes();
-        let res = Types::from_bytes(&buf[..]);
-        assert!(res.is_ok());
-    });
-}
 
 #[bench]
 fn bench_encode(b: &mut Bencher) {
@@ -181,7 +220,7 @@ fn bench_parse(b: &mut Bencher) {
 
     b.iter(|| {
         let mut reader = &buf[..];
-        let entries = cor::Entries::parse(&mut reader).unwrap();
+        let entries = Entries::parse(&mut reader).unwrap();
         assert!(!entries.is_empty());
     });
 }
@@ -192,7 +231,7 @@ fn bench_decode(b: &mut Bencher) {
     let buf = all_types.to_bytes();
 
     let mut reader = &buf[..];
-    let entries = cor::Entries::parse(&mut reader).unwrap();
+    let entries = Entries::parse(&mut reader).unwrap();
 
     b.iter(|| {
         let all_types = Types::decode(&entries);

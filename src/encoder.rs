@@ -100,7 +100,7 @@ macro_rules! impl_item {
     )*};
 }
 
-impl_item! { @sign: i16, i32, i64 }
+impl_item! { @sign: i8, i16, i32, i64 }
 impl_item! { @unsign: u16, u32, u64 }
 
 impl Item for &str {
@@ -169,7 +169,7 @@ impl Item for Entries<'_> {
     }
 
     fn encode(&self, writer: &mut (impl Write + ?Sized)) -> Result<()> {
-        for Entry { key, value } in self.iter() {
+        for (key, value) in self.iter() {
             Value::encode(value, writer, *key)?;
         }
         writer.write_all(&[10])

@@ -14,7 +14,7 @@ pub use cor_macro::*;
 pub use encoder::FieldEncoder;
 
 pub use convert::ConvertFrom;
-pub use entry::{Entries, Entry};
+pub use entry::Entries;
 
 pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 pub type Result<T, E = Error> = std::result::Result<T, E>;

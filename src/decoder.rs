@@ -91,7 +91,7 @@ impl<'de> Entries<'de> {
                 }
                 code => Err(errors::UnknownType { code }.into()),
             }?;
-            obj.push(Entry { key, value });
+            obj.push((key, value));
         }
 
         Ok(Entries(obj))
