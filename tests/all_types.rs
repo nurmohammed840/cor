@@ -1,5 +1,8 @@
-#![allow(warnings)]
+#![feature(test)]
+
+extern crate test;
 use cor::{Decoder, Encoder};
+use test::Bencher;
 
 #[derive(Encoder, Decoder, Clone, Debug, PartialEq)]
 struct Types<'a> {
@@ -56,7 +59,7 @@ struct Types<'a> {
     #[key = 21]
     user: User,
 
-    // ----
+    // ---------------
     #[key = 22]
     arr_bool: Vec<bool>,
 }
@@ -71,46 +74,52 @@ struct User {
     email: Option<String>,
 }
 
+impl<'a> Types<'a> {
+    fn new() -> Self {
+        Types {
+            bool_true: true,
+            bool_false: false,
+
+            u16_min: 0,
+            u16_max: u16::MAX,
+
+            i16_min: i16::MIN,
+            i16_max: i16::MAX,
+
+            u32_min: 0,
+            u32_max: u32::MAX,
+
+            i32_min: i32::MIN,
+            i32_max: i32::MAX,
+
+            u64_min: 0,
+            u64_max: u64::MAX,
+
+            i64_min: i64::MIN,
+            i64_max: i64::MAX,
+
+            f32_min: f32::MIN,
+            f32_max: f32::MAX,
+
+            f64_min: f64::MIN,
+            f64_max: f64::MAX,
+
+            string: "Hello World",
+            bytes: "Hello, World".as_bytes(),
+            user: User {
+                id: vec![1, 2, 3, 4, 5],
+                name: "Alex".into(),
+                email: None,
+            },
+
+            arr_bool: vec![true, false],
+        }
+    }
+}
+
 #[test]
 fn test_all_types() {
-    let all_types = Types {
-        bool_true: true,
-        bool_false: false,
-
-        u16_min: 0,
-        u16_max: u16::MAX,
-
-        i16_min: i16::MIN,
-        i16_max: i16::MAX,
-
-        u32_min: 0,
-        u32_max: u32::MAX,
-
-        i32_min: i32::MIN,
-        i32_max: i32::MAX,
-
-        u64_min: 0,
-        u64_max: u64::MAX,
-
-        i64_min: i64::MIN,
-        i64_max: i64::MAX,
-
-        f32_min: f32::MIN,
-        f32_max: f32::MAX,
-
-        f64_min: f64::MIN,
-        f64_max: f64::MAX,
-
-        string: "Hello World",
-        bytes: "Hello, World".as_bytes(),
-        user: User {
-            id: vec![1, 2, 3, 4, 5],
-            name: "Alex".into(),
-            email: None,
-        },
-
-        arr_bool: vec![true, false],
-    };
+    let all_types = Types::new();
 
     let mut buf = Vec::new();
     all_types.encode(&mut buf).unwrap();
@@ -120,8 +129,32 @@ fn test_all_types() {
     let entries = cor::Entries::parse(&mut reader).unwrap();
     let new_all_types = Types::decode(&entries);
 
+    // println!("{:#?}", new_all_types);
     println!("{:#?}", cor::Value::Struct(entries));
-
-    // println!("{:#?}", new_all_types.as_ref().unwrap());
     assert_eq!(all_types, new_all_types.unwrap());
+}
+
+#[bench]
+fn bench_encode(b: &mut Bencher) {
+    let all_types = Types::new();
+    b.iter(|| {
+        let mut buf = Vec::new();
+        all_types.encode(&mut buf).unwrap();
+        assert!(!buf.is_empty());
+    });
+}
+
+#[bench]
+fn bench_decode(b: &mut Bencher) {
+    let all_types = Types::new();
+
+    let mut buf = Vec::new();
+    all_types.encode(&mut buf).unwrap();
+
+    b.iter(|| {
+        let mut reader = &buf[..];
+        let entries = cor::Entries::parse(&mut reader).unwrap();
+        let all_types = Types::decode(&entries);
+        assert!(all_types.is_ok());
+    });
 }

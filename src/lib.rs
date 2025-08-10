@@ -2,9 +2,9 @@ mod convert;
 mod decoder;
 mod encoder;
 mod entry;
-mod varint;
 mod print;
 mod utils;
+mod varint;
 mod zig_zag;
 
 pub mod errors;
