@@ -53,7 +53,7 @@ impl Debug for List<'_> {
 impl<'de> fmt::Debug for Entries<'de> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_map()
-            .entries(self.0.iter().map(|(key, value)| (key, value)))
+            .entries(self.iter().map(|(k, v)| (k, v)))
             .finish()
     }
 }

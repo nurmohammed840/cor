@@ -60,7 +60,7 @@ fn parse_list<'de>(reader: &mut &'de [u8]) -> Result<List<'de>> {
 
 impl<'de> Entries<'de> {
     pub fn parse(reader: &mut &'de [u8]) -> Result<Self> {
-        let mut obj = Vec::new();
+        let mut entries = Entries::default();
 
         loop {
             let (key, ty) = decode_field_ty(reader)?;
@@ -91,9 +91,9 @@ impl<'de> Entries<'de> {
                 }
                 code => Err(errors::UnknownType { code }.into()),
             }?;
-            obj.push((key, value));
+            entries.insert(key, value);
         }
 
-        Ok(Entries(obj))
+        Ok(entries)
     }
 }
