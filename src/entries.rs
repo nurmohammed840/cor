@@ -4,11 +4,11 @@ use crate::{Value, convert::ConvertFrom, errors};
 pub struct Entries<'de>(Vec<(u16, Value<'de>)>);
 
 impl<'de> Entries<'de> {
+    #[inline]
     pub fn new() -> Self {
-        Self::default()
+        Self(Vec::with_capacity(8))
     }
 
-    #[inline]
     pub fn get(&self, k: u16) -> Option<&Value<'de>> {
         self.0
             .iter()

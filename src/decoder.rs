@@ -17,16 +17,16 @@ fn parse_header(reader: &mut &[u8]) -> Result<(u64, u8)> {
 }
 
 fn parse_str<'de>(reader: &mut &'de [u8]) -> Result<&'de str> {
-    Ok(str::from_utf8(parse_bytes(reader)?)?)
+    Ok(parse_bytes(reader).map(str::from_utf8)??)
 }
 
 fn parse_bytes<'de>(reader: &mut &'de [u8]) -> Result<&'de [u8]> {
     let len = varint::read_unsigned(reader).map(u32::try_from)??;
-    utils::read_bytes(reader, len as usize)
+    utils::read_bytes(reader, len.try_into().unwrap())
 }
 
 fn collect<T>(len: u32, mut f: impl FnMut() -> Result<T>) -> Result<Vec<T>> {
-    let mut arr = Vec::new();
+    let mut arr = Vec::with_capacity(len.try_into().unwrap());
     for _ in 0..len {
         arr.push(f()?);
     }
@@ -41,7 +41,7 @@ fn parse_list<'de>(reader: &mut &'de [u8]) -> Result<List<'de>> {
         0 | 1 => collect(len, || match utils::read_byte(reader)? {
             0 => Ok(false),
             1 => Ok(true),
-            v => Err(errors::ParseError::new(format!("invalid boolean value: `{}`", v)).into()),
+            v => Err(errors::ParseError::new(format!("invalid boolean value: `{v}`")).into()),
         })
         .map(List::Bool),
         2 => collect(len, || utils::read_buf(reader).map(f32::from_le_bytes)).map(List::F32),
@@ -58,8 +58,7 @@ fn parse_list<'de>(reader: &mut &'de [u8]) -> Result<List<'de>> {
 
 impl<'de> Entries<'de> {
     pub fn parse(reader: &mut &'de [u8]) -> Result<Self> {
-        let mut entries = Entries::default();
-
+        let mut entries = Entries::new();
         loop {
             let (key, ty) = parse_header(reader)?;
             let value = match ty {
@@ -91,7 +90,6 @@ impl<'de> Entries<'de> {
             }?;
             entries.insert(key.try_into()?, value);
         }
-
         Ok(entries)
     }
 }
