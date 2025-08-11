@@ -3,7 +3,7 @@ use std::io::Result;
 use varint::*;
 
 pub trait FieldEncoder {
-    fn encode(&self, writer: &mut (impl Write + ?Sized), id: u32) -> Result<()>;
+    fn encode(&self, writer: &mut (impl Write + ?Sized), id: u16) -> Result<()>;
 }
 
 trait Item {
@@ -11,7 +11,7 @@ trait Item {
     fn encode(&self, writer: &mut (impl Write + ?Sized)) -> Result<()>;
 }
 
-fn encode_field_ty(writer: &mut (impl Write + ?Sized), id: u32, ty: u8) -> Result<()> {
+fn encode_header(writer: &mut (impl Write + ?Sized), id: u32, ty: u8) -> Result<()> {
     if id < 15 {
         let header = (id as u8) << 4;
         writer.write_all(&[header | ty])
@@ -158,7 +158,7 @@ impl<T: Item> Item for Vec<T> {
         // +--------+--------+...+--------+--------+...+--------+
         // |1111tttt| size                | elements            |
         // +--------+--------+...+--------+--------+...+--------+
-        encode_field_ty(writer, u32_list_len(self.len())?, T::ty())?;
+        encode_header(writer, u32_list_len(self.len())?, T::ty())?;
         self.iter().try_for_each(|el| T::encode(el, writer))
     }
 }
@@ -189,7 +189,7 @@ impl<T: Encoder> Item for T {
 
 impl<T: FieldEncoder> FieldEncoder for Option<T> {
     #[inline]
-    fn encode(&self, writer: &mut (impl Write + ?Sized), id: u32) -> Result<()> {
+    fn encode(&self, writer: &mut (impl Write + ?Sized), id: u16) -> Result<()> {
         match self {
             None => Ok(()),
             Some(val) => FieldEncoder::encode(val, writer, id),
@@ -199,20 +199,20 @@ impl<T: FieldEncoder> FieldEncoder for Option<T> {
 
 impl FieldEncoder for bool {
     #[inline]
-    fn encode(&self, writer: &mut (impl Write + ?Sized), id: u32) -> Result<()> {
+    fn encode(&self, writer: &mut (impl Write + ?Sized), id: u16) -> Result<()> {
         let ty = match self {
             false => 0,
             true => 1,
         };
-        encode_field_ty(writer, id, ty)
+        encode_header(writer, id.into(), ty)
     }
 }
 
 macro_rules! impl_field_encoder {
     [$($ty:ty)*] => [$(
         impl FieldEncoder for $ty {
-            fn encode(&self, writer: &mut (impl Write + ?Sized), id: u32) -> Result<()> {
-                encode_field_ty(writer, id, <Self as Item>::ty())?;
+            fn encode(&self, writer: &mut (impl Write + ?Sized), id: u16) -> Result<()> {
+                encode_header(writer, id.into(), <Self as Item>::ty())?;
                 <Self as Item>::encode(self, writer)
             }
         }
@@ -220,8 +220,8 @@ macro_rules! impl_field_encoder {
 
     [$($ty:ty : $target:ty)*] => [$(
         impl FieldEncoder for $ty {
-            fn encode(&self, writer: &mut (impl Write + ?Sized), id: u32) -> Result<()> {
-                encode_field_ty(writer, id, <$target as Item>::ty())?;
+            fn encode(&self, writer: &mut (impl Write + ?Sized), id: u16) -> Result<()> {
+                encode_header(writer, id.into(), <$target as Item>::ty())?;
                 <$target as Item>::encode(&self, writer)
             }
         }
@@ -241,13 +241,13 @@ impl_field_encoder! {
 }
 
 impl FieldEncoder for String {
-    fn encode(&self, writer: &mut (impl Write + ?Sized), id: u32) -> Result<()> {
+    fn encode(&self, writer: &mut (impl Write + ?Sized), id: u16) -> Result<()> {
         FieldEncoder::encode(self.as_str(), writer, id)
     }
 }
 
 impl FieldEncoder for Vec<u8> {
-    fn encode(&self, writer: &mut (impl Write + ?Sized), id: u32) -> Result<()> {
+    fn encode(&self, writer: &mut (impl Write + ?Sized), id: u16) -> Result<()> {
         FieldEncoder::encode(self.as_slice(), writer, id)
     }
 }
@@ -255,16 +255,16 @@ impl FieldEncoder for Vec<u8> {
 macro_rules! impl_for {
     (unsign: $($ty: ty)*) => {$(
         impl FieldEncoder for $ty {
-            fn encode(&self, writer: &mut (impl Write + ?Sized), id: u32) -> Result<()> {
-                encode_field_ty(writer, id, 5)?;
+            fn encode(&self, writer: &mut (impl Write + ?Sized), id: u16) -> Result<()> {
+                encode_header(writer, id.into(), 5)?;
                 encode_unsign(writer, (*self).into())
             }
         }
     )*};
     (sign: $($ty: ty)*) => {$(
         impl FieldEncoder for $ty {
-            fn encode(&self, writer: &mut (impl Write + ?Sized), id: u32) -> Result<()> {
-                encode_field_ty(writer, id, 4)?;
+            fn encode(&self, writer: &mut (impl Write + ?Sized), id: u16) -> Result<()> {
+                encode_header(writer, id.into(), 4)?;
                 encode_sign(writer, (*self).into())
             }
         }
@@ -283,13 +283,13 @@ impl<'de, T> FieldEncoder for T
 where
     T: IntoValue<'de>,
 {
-    fn encode(&self, writer: &mut (impl Write + ?Sized), id: u32) -> Result<()> {
+    fn encode(&self, writer: &mut (impl Write + ?Sized), id: u16) -> Result<()> {
         Value::encode(&self.to_value(), writer, id)
     }
 }
 
 impl FieldEncoder for Value<'_> {
-    fn encode(&self, writer: &mut (impl Write + ?Sized), id: u32) -> Result<()> {
+    fn encode(&self, writer: &mut (impl Write + ?Sized), id: u16) -> Result<()> {
         match self {
             Value::Bool(val) => FieldEncoder::encode(val, writer, id),
             Value::F32(val) => FieldEncoder::encode(val, writer, id),
@@ -307,15 +307,15 @@ impl FieldEncoder for Value<'_> {
 pub fn encode_struct_field<T: Encoder>(
     this: &T,
     writer: &mut (impl Write + ?Sized),
-    id: u32,
+    id: u16,
 ) -> Result<()> {
-    encode_field_ty(writer, id, 9)?;
+    encode_header(writer, id.into(), 9)?;
     T::encode(this, writer)
 }
 
 impl<T: Item> FieldEncoder for Vec<T> {
-    fn encode(&self, writer: &mut (impl Write + ?Sized), id: u32) -> Result<()> {
-        encode_field_ty(writer, id, 8)?;
+    fn encode(&self, writer: &mut (impl Write + ?Sized), id: u16) -> Result<()> {
+        encode_header(writer, id.into(), 8)?;
         Item::encode(self, writer)
     }
 }

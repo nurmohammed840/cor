@@ -89,7 +89,7 @@ struct Types<'a> {
     arr_f64: Vec<f64>,
 
     #[key = 33]
-    matrix_2d: Vec<Vec<f32>>,
+    matrix_2d: Vec<Vec<f64>>,
 
     #[key = 34]
     matrixs: Vec<Vec<Vec<f32>>>,

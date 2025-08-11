@@ -1,22 +1,26 @@
 use crate::{Value, convert::ConvertFrom, errors};
 
 #[derive(Clone, Default)]
-pub struct Entries<'de>(Vec<(u32, Value<'de>)>);
+pub struct Entries<'de>(Vec<(u16, Value<'de>)>);
 
 impl<'de> Entries<'de> {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     #[inline]
-    pub fn get(&self, k: u32) -> Option<&Value<'de>> {
+    pub fn get(&self, k: u16) -> Option<&Value<'de>> {
         self.0
             .iter()
             .find_map(|(key, value)| (*key == k).then_some(value))
     }
 
     #[inline]
-    pub fn insert(&mut self, key: u32, value: Value<'de>) {
+    pub fn insert(&mut self, key: u16, value: Value<'de>) {
         self.0.push((key, value));
     }
 
-    pub fn get_and_convert<'v, T>(&'v self, k: u32) -> Result<T, errors::ConvertError>
+    pub fn get_and_convert<'v, T>(&'v self, k: u16) -> Result<T, errors::ConvertError>
     where
         T: ConvertFrom<Option<&'v Value<'de>>>,
     {
@@ -36,7 +40,7 @@ impl<'de> Entries<'de> {
         self.0.len()
     }
 
-    pub(crate) fn iter(&self) -> std::slice::Iter<'_, (u32, Value<'de>)> {
+    pub(crate) fn iter(&self) -> std::slice::Iter<'_, (u16, Value<'de>)> {
         self.0.iter()
     }
 }

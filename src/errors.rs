@@ -98,7 +98,7 @@ impl Value<'_> {
 }
 
 pub struct ConvertError {
-    pub key: Option<u32>,
+    pub key: Option<u16>,
     pub error: crate::Error,
 }
 

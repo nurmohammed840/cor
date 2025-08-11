@@ -2,22 +2,18 @@ use crate::*;
 
 use super::Result;
 
-fn decode_field_ty(reader: &mut &[u8]) -> Result<(u32, u8)> {
+fn parse_header(reader: &mut &[u8]) -> Result<(u64, u8)> {
     let byte = utils::read_byte(reader)?;
 
     let ty = byte & 0b00001111;
-    let id = (byte >> 4) as u32;
+    let id = (byte >> 4) as u64;
 
     let id = if id == 0b1111 {
-        try_into_u32(varint::read_unsigned(reader)? + 15)?
+        varint::read_unsigned(reader)? + 15
     } else {
         id
     };
     Ok((id, ty))
-}
-
-fn try_into_u32(num: u64) -> Result<u32> {
-    Ok(num.try_into()?)
 }
 
 fn parse_str<'de>(reader: &mut &'de [u8]) -> Result<&'de str> {
@@ -25,7 +21,7 @@ fn parse_str<'de>(reader: &mut &'de [u8]) -> Result<&'de str> {
 }
 
 fn parse_bytes<'de>(reader: &mut &'de [u8]) -> Result<&'de [u8]> {
-    let len = varint::read_unsigned(reader).map(try_into_u32)??;
+    let len = varint::read_unsigned(reader).map(u32::try_from)??;
     utils::read_bytes(reader, len as usize)
 }
 
@@ -38,7 +34,9 @@ fn collect<T>(len: u32, mut f: impl FnMut() -> Result<T>) -> Result<Vec<T>> {
 }
 
 fn parse_list<'de>(reader: &mut &'de [u8]) -> Result<List<'de>> {
-    let (len, ty) = decode_field_ty(reader)?;
+    let (len, ty) = parse_header(reader)?;
+    let len = u32::try_from(len)?;
+
     match ty {
         0 | 1 => collect(len, || match utils::read_byte(reader)? {
             0 => Ok(false),
@@ -63,7 +61,7 @@ impl<'de> Entries<'de> {
         let mut entries = Entries::default();
 
         loop {
-            let (key, ty) = decode_field_ty(reader)?;
+            let (key, ty) = parse_header(reader)?;
             let value = match ty {
                 0 => Ok(Value::Bool(false)),
                 1 => Ok(Value::Bool(true)),
@@ -91,7 +89,7 @@ impl<'de> Entries<'de> {
                 }
                 code => Err(errors::UnknownType { code }.into()),
             }?;
-            entries.insert(key, value);
+            entries.insert(key.try_into()?, value);
         }
 
         Ok(entries)

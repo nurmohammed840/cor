@@ -68,7 +68,7 @@ pub fn expand(input: &DeriveInput) -> TokenStream {
         }
 
         impl #impl_generics ::cor::FieldEncoder for #ident #ty_generics #where_clause {
-            fn encode(&self, w: &mut (impl ::std::io::Write + ?::std::marker::Sized), id: u32) -> ::std::io::Result<()> {
+            fn encode(&self, w: &mut (impl ::std::io::Write + ?::std::marker::Sized), id: u16) -> ::std::io::Result<()> {
                 ::cor::__private::encode_struct_field(self, w, id)
             }
         }
