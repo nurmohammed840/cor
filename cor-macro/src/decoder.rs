@@ -1,8 +1,5 @@
-use quote2::{
-    Quote,
-    proc_macro2::{Span, TokenStream},
-    quote,
-};
+use proc_macro2::{Span, TokenStream};
+use quote2::{Quote, quote};
 use syn::*;
 
 pub fn expand(input: &DeriveInput) -> TokenStream {

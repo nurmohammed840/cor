@@ -187,7 +187,7 @@ fn test_all_types() {
     let new_all_types = Types::decode(&entries);
 
     // println!("{:#?}", new_all_types);
-    println!("{:#?}", cor::Value::Struct(entries));
+    // println!("{:#?}", cor::Value::Struct(entries));
     assert_eq!(all_types, new_all_types.unwrap());
 }
 

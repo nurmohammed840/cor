@@ -1,10 +1,6 @@
+use proc_macro2::{Punct, Spacing, TokenStream};
+use quote2::{Quote, ToTokens, quote};
 use std::collections::HashSet;
-
-use quote2::{
-    Quote, ToTokens,
-    proc_macro2::{Punct, Spacing, TokenStream},
-    quote,
-};
 use syn::{spanned::Spanned, *};
 
 pub fn expand(input: &DeriveInput) -> TokenStream {
@@ -22,13 +18,17 @@ pub fn expand(input: &DeriveInput) -> TokenStream {
             for field in fields {
                 if let Some(key) = crate::utils::get_key(field) {
                     match seen.get(key) {
-                        Some(key1) => {
-                            let mut err = Error::new(key1.span(), "duplicate key");
+                        Some(key_0) => {
+                            let loc = key.span().start();
+                            let mut err = Error::new(
+                                key_0.span(),
+                                format!("duplicate key at line {}", loc.line),
+                            );
                             err.combine(Error::new(
                                 key.span(),
                                 format!(
                                     "duplicate key `{}` later defined here",
-                                    key1.to_token_stream()
+                                    key_0.to_token_stream()
                                 ),
                             ));
                             let err = err.to_compile_error();
